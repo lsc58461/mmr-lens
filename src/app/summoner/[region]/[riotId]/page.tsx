@@ -103,6 +103,7 @@ export default async function SummonerPage({
     currentPoints,
     estimatedRank,
     estimatedPoints,
+    errorMargin,
     gap,
     recentWinrate,
     matches,
@@ -115,6 +116,7 @@ export default async function SummonerPage({
     .map((m, i, arr) => ({
       game: i === arr.length - 1 ? "최근" : `${arr.length - 1 - i}경기 전`,
       lobby: m.lobbyPoints !== null ? Math.round(m.lobbyPoints) : null,
+      est: m.ratingAfter,
       win: m.win,
     }));
 
@@ -169,6 +171,11 @@ export default async function SummonerPage({
               style={estimatedRank ? { color: TIER_COLORS[estimatedRank.tier] } : undefined}
             >
               {estimatedRank?.label ?? "표본 부족"}
+              {errorMargin !== null && (
+                <span className="ml-1.5 text-sm font-normal text-muted-foreground">
+                  ±{errorMargin}pt
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -191,8 +198,9 @@ export default async function SummonerPage({
         <CardHeader>
           <CardTitle className="text-base">경기별 로비 평균 MMR</CardTitle>
           <CardDescription>
-            최근 {matches.length}경기에서 만난 플레이어 {sampledPlayers}명의 현재
-            랭크 기준 · 점 색상은 승(파랑)/패(빨강)
+            최근 {matches.length}경기(리메이크 제외)에서 만난 플레이어{" "}
+            {sampledPlayers}명의 현재 랭크 기준 · 점 색상은 승(파랑)/패(빨강) ·
+            점선은 경기별 추정 MMR 궤적
             {recentWinrate !== null &&
               ` · 최근 승률 ${Math.round(recentWinrate * 100)}%`}
           </CardDescription>
@@ -255,8 +263,8 @@ export default async function SummonerPage({
 
       <p className="text-xs text-muted-foreground">
         * 라이엇은 MMR을 공개하지 않으므로 이 수치는 같은 경기에 배정된
-        플레이어들의 현재 랭크를 근거로 한 추정치입니다. 표본이 적을수록 오차가
-        커질 수 있어요.
+        플레이어들의 현재 랭크(로비별 최고/최저 제외 절사평균)와 승패 성과(Elo
+        업데이트)를 결합한 추정치입니다. 표본이 적을수록 오차가 커질 수 있어요.
       </p>
     </div>
   );

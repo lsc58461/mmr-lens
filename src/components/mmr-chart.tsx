@@ -12,11 +12,13 @@ import { pointsToRank } from "@/lib/mmr/rank";
 export interface MmrChartPoint {
   game: string; // "8경기 전" ... "최근"
   lobby: number | null;
+  est: number | null; // 그 경기까지 반영한 추정 레이팅
   win: boolean;
 }
 
 const chartConfig = {
   lobby: { label: "로비 평균 MMR", color: "var(--chart-1)" },
+  est: { label: "추정 MMR", color: "var(--chart-2)" },
 } satisfies ChartConfig;
 
 export function MmrChart({
@@ -27,7 +29,7 @@ export function MmrChart({
   currentPoints: number | null;
 }) {
   const values = data
-    .map((d) => d.lobby)
+    .flatMap((d) => [d.lobby, d.est])
     .filter((v): v is number => v !== null)
     .concat(currentPoints !== null ? [currentPoints] : []);
   const min = Math.min(...values);
@@ -50,9 +52,11 @@ export function MmrChart({
         <ChartTooltip
           content={
             <ChartTooltipContent
-              formatter={(value) => (
+              formatter={(value, name) => (
                 <span>
-                  {pointsToRank(Number(value)).label} ({Math.round(Number(value))}pt)
+                  {chartConfig[name as keyof typeof chartConfig]?.label}:{" "}
+                  {pointsToRank(Number(value)).label} (
+                  {Math.round(Number(value))}pt)
                 </span>
               )}
             />
@@ -75,6 +79,15 @@ export function MmrChart({
               strokeWidth={1.5}
             />
           )}
+        />
+        <Line
+          dataKey="est"
+          type="monotone"
+          stroke="var(--color-est)"
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          connectNulls
+          dot={false}
         />
       </LineChart>
     </ChartContainer>

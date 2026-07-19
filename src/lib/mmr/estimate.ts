@@ -1,7 +1,8 @@
 // MMR 추정 파이프라인.
-// 1) 최근 솔로랭크 매치를 가져오고
-// 2) 각 매치에서 팀별로 고르게 뽑은 참가자들의 "현재 랭크"를 조회해 로비 평균을 구한 뒤
-// 3) 최근 경기에 가중치를 두고 승률 보정을 더해 추정 MMR을 계산한다.
+// 1) 최근 솔로랭크 매치를 가져와 리메이크(5분 미만)를 제외하고
+// 2) 각 매치에서 팀별로 고르게 뽑은 참가자들의 "현재 랭크"로 로비 절사평균을 구한 뒤
+// 3) 오래된 경기부터 순서대로 [로비 관측 보정 → Elo 승패 업데이트]를 반복해
+//    최종 레이팅을 추정한다. 로비 평균 = 매치메이커가 본 내 실력, Elo = 기대 대비 승패 성과.
 //
 // 개발용 API 키(2분당 100회) 안에서 동작하도록 매치 수와 참가자 샘플 수를 제한한다.
 
@@ -15,10 +16,12 @@ import {
 import type { LeagueEntry, MatchInfo, PlatformRegion } from "@/lib/riot/types";
 import { pointsToRank, rankToPoints, type RankLabel } from "./rank";
 
-const MATCH_COUNT = 8; // 분석할 최근 솔로랭크 경기 수
+const MATCH_FETCH_COUNT = 10; // 리메이크 제외분을 감안해 여유 있게 조회
+const MATCH_COUNT = 8; // 실제 분석할 경기 수
+const MIN_GAME_DURATION = 300; // 5분 미만은 리메이크로 간주하고 제외
 const SAMPLES_PER_TEAM = 3; // 매치당 팀별 랭크 조회 인원 (3+3 = 매치당 6회 호출)
-const RECENCY_DECAY = 0.85; // 최신 경기 가중치 감쇠율
-const WINRATE_ADJUST = 150; // 승률 50% 대비 최대 보정 포인트(±75)
+const OBS_WEIGHT = 0.35; // 로비 평균(매치메이커 관측)을 레이팅에 반영하는 비율
+const ELO_K = 32; // Elo 승패 업데이트 K-팩터 (디비전 100pt 스케일 기준)
 
 export interface MatchSample {
   matchId: string;
@@ -26,8 +29,9 @@ export interface MatchSample {
   win: boolean;
   championName: string;
   kda: string;
-  lobbyPoints: number | null; // 로비 평균 MMR 포인트 (표본 없으면 null)
+  lobbyPoints: number | null; // 로비 절사평균 MMR 포인트 (표본 없으면 null)
   sampleSize: number;
+  ratingAfter: number | null; // 이 경기까지 반영한 추정 레이팅 (그래프용)
 }
 
 export interface MmrEstimate {
@@ -37,6 +41,7 @@ export interface MmrEstimate {
   currentRank: RankLabel | null;
   estimatedPoints: number | null;
   estimatedRank: RankLabel | null;
+  errorMargin: number | null; // 로비 표본 분산 기반 95% 오차범위(±pt)
   gap: number | null; // 추정 - 현재 (양수면 티어보다 실력이 높다는 뜻)
   recentWinrate: number | null;
   matches: MatchSample[];
@@ -60,6 +65,14 @@ function sampleParticipants(match: MatchInfo, selfPuuid: string) {
   return [...byTeam.values()].flatMap((team) => team.slice(0, SAMPLES_PER_TEAM));
 }
 
+/** 절사평균: 표본이 5명 이상이면 최고/최저 1명씩 제외 (부캐·복귀 유저 이상치 완화) */
+function trimmedMean(values: number[]): number | null {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const trimmed = sorted.length >= 5 ? sorted.slice(1, -1) : sorted;
+  return trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+}
+
 export async function estimateMmr(
   platform: PlatformRegion,
   gameName: string,
@@ -68,7 +81,7 @@ export async function estimateMmr(
   const account = await getAccountByRiotId(platform, gameName, tagLine);
   const [entries, matchIds] = await Promise.all([
     getLeagueEntries(platform, account.puuid),
-    getRankedMatchIds(platform, account.puuid, MATCH_COUNT),
+    getRankedMatchIds(platform, account.puuid, MATCH_FETCH_COUNT),
   ]);
 
   const solo = soloQueueEntry(entries);
@@ -76,9 +89,12 @@ export async function estimateMmr(
     ? rankToPoints(solo.tier, solo.rank, solo.leaguePoints)
     : null;
 
-  const matches = await Promise.all(
+  const allMatches = await Promise.all(
     matchIds.map((id) => getMatch(platform, id)),
   );
+  const matches = allMatches
+    .filter((m) => m.gameDuration >= MIN_GAME_DURATION)
+    .slice(0, MATCH_COUNT);
 
   // 조회할 참가자 puuid를 매치 전체에서 모아 중복 제거 후 한 번씩만 조회
   const sampledByMatch = matches.map((m) => sampleParticipants(m, account.puuid));
@@ -101,46 +117,59 @@ export async function estimateMmr(
     }),
   );
 
+  // match-v5는 최신순 반환 — 표시용 배열도 최신순 유지
   const matchSamples: MatchSample[] = matches.map((m, i) => {
     const self = m.participants.find((p) => p.puuid === account.puuid);
     const sampled = sampledByMatch[i]
       .map((p) => pointsByPuuid.get(p.puuid))
       .filter((v): v is number => v !== undefined);
-    const lobbyPoints = sampled.length
-      ? sampled.reduce((a, b) => a + b, 0) / sampled.length
-      : null;
     return {
       matchId: m.matchId,
       gameCreation: m.gameCreation,
       win: self?.win ?? false,
       championName: self?.championName ?? "",
       kda: self ? `${self.kills}/${self.deaths}/${self.assists}` : "",
-      lobbyPoints,
+      lobbyPoints: trimmedMean(sampled),
       sampleSize: sampled.length,
+      ratingAfter: null,
     };
   });
 
-  // 최신 경기 순으로 정렬돼 있다고 가정(match-v5가 최신순 반환)하고 가중 평균
-  let weightedSum = 0;
-  let weightTotal = 0;
-  matchSamples.forEach((s, i) => {
-    if (s.lobbyPoints === null) return;
-    const w = Math.pow(RECENCY_DECAY, i) * Math.min(s.sampleSize / 4, 1.5);
-    weightedSum += s.lobbyPoints * w;
-    weightTotal += w;
-  });
+  // 오래된 경기부터 순차 추정:
+  //  - 로비 평균이 있으면 관측 보정(레이팅을 로비 쪽으로 OBS_WEIGHT만큼 이동)
+  //  - 이어서 Elo 업데이트: 로비가 강할수록 승리 가치가 커진다
+  let rating: number | null = null;
+  for (const s of [...matchSamples].reverse()) {
+    if (s.lobbyPoints !== null) {
+      rating =
+        rating === null
+          ? s.lobbyPoints
+          : rating + OBS_WEIGHT * (s.lobbyPoints - rating);
+    }
+    if (rating !== null) {
+      const opponent = s.lobbyPoints ?? rating;
+      const expected = 1 / (1 + Math.pow(10, (opponent - rating) / 400));
+      rating += ELO_K * ((s.win ? 1 : 0) - expected);
+    }
+    s.ratingAfter = rating !== null ? Math.round(rating) : null;
+  }
+  const estimatedPoints = rating;
+
+  // 로비 평균들의 표준오차 기반 95% 오차범위
+  const lobbies = matchSamples
+    .map((s) => s.lobbyPoints)
+    .filter((v): v is number => v !== null);
+  let errorMargin: number | null = null;
+  if (lobbies.length >= 2) {
+    const mean = lobbies.reduce((a, b) => a + b, 0) / lobbies.length;
+    const variance =
+      lobbies.reduce((a, v) => a + (v - mean) ** 2, 0) / (lobbies.length - 1);
+    errorMargin = Math.round((1.96 * Math.sqrt(variance)) / Math.sqrt(lobbies.length));
+  }
 
   const played = matchSamples.length;
   const wins = matchSamples.filter((s) => s.win).length;
   const recentWinrate = played ? wins / played : null;
-
-  let estimatedPoints: number | null = null;
-  if (weightTotal > 0) {
-    estimatedPoints = weightedSum / weightTotal;
-    if (recentWinrate !== null) {
-      estimatedPoints += (recentWinrate - 0.5) * WINRATE_ADJUST;
-    }
-  }
 
   const totalSamples = matchSamples.reduce((a, s) => a + s.sampleSize, 0);
   const confidence =
@@ -154,6 +183,7 @@ export async function estimateMmr(
     estimatedPoints,
     estimatedRank:
       estimatedPoints !== null ? pointsToRank(estimatedPoints) : null,
+    errorMargin,
     gap:
       estimatedPoints !== null && currentPoints !== null
         ? Math.round(estimatedPoints - currentPoints)

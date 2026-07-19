@@ -187,9 +187,10 @@ export default async function SummonerPage({
               style={estimatedRank ? { color: TIER_COLORS[estimatedRank.tier] } : undefined}
             >
               {estimatedRank?.label ?? "표본 부족"}
-              {errorMargin !== null && (
+              {estimatedPoints !== null && (
                 <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-                  ±{errorMargin}pt
+                  {Math.round(estimatedPoints).toLocaleString()}pt
+                  {errorMargin !== null && ` ±${errorMargin}`}
                 </span>
               )}
             </CardTitle>

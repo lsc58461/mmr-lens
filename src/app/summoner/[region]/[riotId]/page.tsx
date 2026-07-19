@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/card";
 import {
   championIconUrl,
+  championNameKo,
+  getChampionNamesKo,
   getDDragonVersion,
   profileIconUrl,
   tierEmblemUrl,
@@ -183,6 +185,7 @@ export default async function SummonerPage({
   }
 
   const ddVersion = await getDDragonVersion();
+  const champNames = await getChampionNamesKo(ddVersion);
 
   // 저장된 이전 분석에는 프로필 정보가 없을 수 있어 보충 조회 (둘 다 캐시됨)
   let profileIconId = result.profileIconId ?? null;
@@ -297,13 +300,13 @@ export default async function SummonerPage({
             <Image
               src={tierEmblemUrl(estimatedRank.tier)}
               alt=""
-              width={160}
-              height={160}
+              width={224}
+              height={224}
               unoptimized
-              className="pointer-events-none absolute -right-4 top-1/2 size-32 -translate-y-1/2 object-contain opacity-90 drop-shadow-xl sm:size-40"
+              className="pointer-events-none absolute -right-2 top-1/2 size-40 -translate-y-1/2 scale-110 object-contain opacity-95 drop-shadow-xl sm:size-56"
             />
           )}
-          <CardHeader className="relative pr-28 sm:pr-40">
+          <CardHeader className="relative pr-36 sm:pr-52">
             <CardDescription className="flex flex-wrap items-center gap-2">
               추정 MMR
               <Badge variant="outline" className="bg-background/60 font-normal">
@@ -321,7 +324,7 @@ export default async function SummonerPage({
             )}
           </CardHeader>
           {verdict && (
-            <CardContent className="relative pr-28 sm:pr-40">
+            <CardContent className="relative pr-36 sm:pr-52">
               <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-2.5 text-xs backdrop-blur-sm sm:text-sm">
                 {verdict.tone === "up" && (
                   <ArrowUp className="size-4 shrink-0 text-emerald-500" />
@@ -454,7 +457,9 @@ export default async function SummonerPage({
               )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="truncate font-medium">{m.championName}</span>
+                  <span className="truncate font-medium">
+                    {championNameKo(champNames, m.championName)}
+                  </span>
                   <span
                     className={`text-xs font-semibold ${
                       m.win ? "text-chart-1" : "text-destructive"

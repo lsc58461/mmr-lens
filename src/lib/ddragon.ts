@@ -39,3 +39,32 @@ export function profileIconUrl(version: string, iconId: number): string {
 export function tierEmblemUrl(tier: string): string {
   return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tier.toLowerCase()}.png`;
 }
+
+/** 챔피언 영문 키 → 한글 이름 매핑 (예: MonkeyKing → 오공) */
+export async function getChampionNamesKo(
+  version: string,
+): Promise<Record<string, string>> {
+  try {
+    return await cached(`ddragon:champnames:ko:${version}`, 60 * 60 * 24 * 7, async () => {
+      const res = await fetch(
+        `https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion.json`,
+        { cache: "no-store", signal: AbortSignal.timeout(8_000) },
+      );
+      if (!res.ok) throw new Error(`champion.json ${res.status}`);
+      const data: { data: Record<string, { id: string; name: string }> } =
+        await res.json();
+      const map: Record<string, string> = {};
+      for (const c of Object.values(data.data)) map[c.id] = c.name;
+      return map;
+    });
+  } catch {
+    return {};
+  }
+}
+
+export function championNameKo(
+  names: Record<string, string>,
+  championName: string,
+): string {
+  return names[NAME_QUIRKS[championName] ?? championName] ?? championName;
+}

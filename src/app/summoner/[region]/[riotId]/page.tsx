@@ -326,7 +326,7 @@ export default async function SummonerPage({
                   width={208}
                   height={208}
                   unoptimized
-                  className="-my-6 -mr-3 size-32 shrink-0 object-contain drop-shadow-xl sm:size-44"
+                  className="-my-6 -mr-3 size-28 shrink-0 object-contain drop-shadow-xl sm:size-36"
                 />
               )}
             </div>

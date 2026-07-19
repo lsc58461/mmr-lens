@@ -17,7 +17,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { pointsToRank } from "@/lib/mmr/rank";
+import { useEffect, useState } from "react";
+import { pointsToRank, pointsToShortLabel } from "@/lib/mmr/rank";
 
 export interface MmrChartPoint {
   game: string; // "8경기 전" ... "최근"
@@ -38,6 +39,16 @@ export function MmrChart({
   data: MmrChartPoint[];
   currentPoints: number | null;
 }) {
+  // 좁은 화면에서는 Y축 라벨을 "플3" 축약형으로 줄여 차트 영역을 넓힌다
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setCompact(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
   const values = data
     .flatMap((d) => [d.lobby, d.est])
     .filter((v): v is number => v !== null)
@@ -59,10 +70,14 @@ export function MmrChart({
         <XAxis dataKey="game" tickLine={false} axisLine={false} fontSize={11} />
         <YAxis
           domain={[Math.floor(min - pad), Math.ceil(max + pad)]}
-          tickFormatter={(v: number) => pointsToRank(v).label.split(" · ")[0]}
+          tickFormatter={(v: number) =>
+            compact
+              ? pointsToShortLabel(v)
+              : pointsToRank(v).label.split(" · ")[0]
+          }
           tickLine={false}
           axisLine={false}
-          width={78}
+          width={compact ? 34 : 78}
           fontSize={11}
         />
         <ChartTooltip

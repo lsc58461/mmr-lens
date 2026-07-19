@@ -65,6 +65,30 @@ export function pointsToRank(points: number): RankLabel {
   };
 }
 
+// "플3", "에1" 같은 커뮤니티식 축약 표기 (모바일 차트 축 등 좁은 공간용)
+const TIER_SHORT: Record<string, string> = {
+  IRON: "아",
+  BRONZE: "브",
+  SILVER: "실",
+  GOLD: "골",
+  PLATINUM: "플",
+  EMERALD: "에",
+  DIAMOND: "다",
+  MASTER: "마",
+  GRANDMASTER: "그마",
+  CHALLENGER: "챌",
+};
+
+/** MMR 포인트를 "플3" 형태의 축약 라벨로 변환 */
+export function pointsToShortLabel(points: number): string {
+  const p = Math.max(0, Math.round(points));
+  const { tier } = pointsToRank(p);
+  const short = TIER_SHORT[tier] ?? tier;
+  if (p >= 2800) return short; // 마스터 이상은 티어만
+  const division = Math.floor((p - Math.floor(p / 400) * 400) / 100);
+  return `${short}${DIVISION_LABELS[division]}`;
+}
+
 export const TIER_COLORS: Record<string, string> = {
   IRON: "#7b7b73",
   BRONZE: "#a46628",

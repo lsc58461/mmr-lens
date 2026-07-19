@@ -29,7 +29,7 @@ export default async function RecentPage() {
           <History className="size-4.5" />
         </span>
         <div>
-          <h1 className="text-xl font-bold tracking-tight">최근 검색</h1>
+          <h1 className="text-lg font-bold tracking-tight sm:text-xl">최근 검색</h1>
           <p className="text-sm text-muted-foreground">
             최근 조회된 소환사 {entries.length}명
           </p>
@@ -67,7 +67,7 @@ export default async function RecentPage() {
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-5 text-right text-sm">
+              <div className="flex shrink-0 items-center gap-3 text-right text-xs sm:gap-5 sm:text-sm">
                 <div>
                   <div className="text-[10px] text-muted-foreground">티어</div>
                   <div

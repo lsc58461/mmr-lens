@@ -126,5 +126,12 @@
   }
   html {
     @apply font-sans;
+    /* 모바일에서는 rem 기준을 낮춰 타이포그래피 전체를 비례 축소 */
+    font-size: 15px;
+  }
+  @media (min-width: 640px) {
+    html {
+      font-size: 16px;
+    }
   }
 }

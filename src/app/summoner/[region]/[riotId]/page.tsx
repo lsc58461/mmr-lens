@@ -187,7 +187,7 @@ export default async function SummonerPage({
       {/* 헤더 */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
             {account.gameName}
             <span className="font-normal text-muted-foreground">
               #{account.tagLine}
@@ -227,7 +227,7 @@ export default async function SummonerPage({
                 {CONFIDENCE_LABELS[confidence]}
               </Badge>
             </CardDescription>
-            <CardTitle className="text-3xl" style={{ color: estColor }}>
+            <CardTitle className="text-2xl sm:text-3xl" style={{ color: estColor }}>
               {estimatedRank?.label ?? "표본 부족"}
             </CardTitle>
             {estimatedPoints !== null && (
@@ -239,7 +239,7 @@ export default async function SummonerPage({
           </CardHeader>
           {verdict && (
             <CardContent>
-              <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-2.5 text-sm backdrop-blur-sm">
+              <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-2.5 text-xs backdrop-blur-sm sm:text-sm">
                 {verdict.tone === "up" && (
                   <ArrowUp className="size-4 shrink-0 text-emerald-500" />
                 )}
@@ -265,7 +265,7 @@ export default async function SummonerPage({
           <CardHeader>
             <CardDescription>현재 티어</CardDescription>
             <CardTitle
-              className="text-2xl"
+              className="text-xl sm:text-2xl"
               style={
                 currentRank ? { color: TIER_COLORS[currentRank.tier] } : undefined
               }

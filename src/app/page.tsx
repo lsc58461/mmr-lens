@@ -34,7 +34,7 @@ export default function Home() {
           <Sparkles className="size-3.5" />
           라이엇 공식 API 데이터 기반
         </Badge>
-        <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-6xl">
+        <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
           내 진짜{" "}
           <span className="bg-gradient-to-r from-primary via-primary to-chart-2 bg-clip-text text-transparent">
             MMR

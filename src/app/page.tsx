@@ -1,11 +1,6 @@
-import { Activity, Gauge, Users } from "lucide-react";
+import { Activity, Gauge, Sparkles, Users } from "lucide-react";
 import { SearchForm } from "@/components/search-form";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 const FEATURES = [
   {
@@ -18,7 +13,7 @@ const FEATURES = [
     icon: Activity,
     title: "MMR 추이 그래프",
     description:
-      "경기별 로비 평균 MMR을 그래프로 보여줘 상승세인지 하락세인지 한눈에 확인할 수 있습니다.",
+      "경기별 로비 평균 MMR과 추정 MMR 궤적을 그래프로 보여줘 상승세인지 하락세인지 한눈에 확인할 수 있습니다.",
   },
   {
     icon: Users,
@@ -30,30 +25,47 @@ const FEATURES = [
 
 export default function Home() {
   return (
-    <div className="flex flex-col items-center gap-12 py-8 sm:py-16">
-      <div className="max-w-2xl space-y-4 text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-          내 진짜 <span className="text-primary">MMR</span>은 몇 점일까?
+    <div className="flex flex-col items-center gap-14 py-10 sm:py-20">
+      <div className="max-w-2xl space-y-5 text-center">
+        <Badge
+          variant="outline"
+          className="gap-1.5 rounded-full border-primary/30 bg-primary/5 px-3 py-1 text-primary"
+        >
+          <Sparkles className="size-3.5" />
+          라이엇 공식 API 데이터 기반
+        </Badge>
+        <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-6xl">
+          내 진짜{" "}
+          <span className="bg-gradient-to-r from-primary via-primary to-chart-2 bg-clip-text text-transparent">
+            MMR
+          </span>
+          은
+          <br className="sm:hidden" /> 몇 점일까?
         </h1>
-        <p className="text-muted-foreground sm:text-lg">
-          라이엇이 공개하지 않는 숨겨진 MMR을
-          <br className="sm:hidden" /> 최근 경기 데이터로 추정해 드립니다.
+        <p className="text-muted-foreground text-pretty sm:text-lg">
+          라이엇이 공개하지 않는 숨겨진 MMR을 최근 경기 데이터로 추정해
+          드립니다.
         </p>
       </div>
 
-      <div className="w-full max-w-xl">
+      <div className="w-full max-w-xl rounded-2xl border bg-card/80 p-5 shadow-lg shadow-primary/5 ring-1 ring-primary/10 backdrop-blur-sm sm:p-6">
         <SearchForm />
       </div>
 
       <div className="grid w-full gap-4 sm:grid-cols-3">
         {FEATURES.map(({ icon: Icon, title, description }) => (
-          <Card key={title}>
-            <CardHeader>
-              <Icon className="mb-1 size-5 text-primary" />
-              <CardTitle className="text-base">{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
-            </CardHeader>
-          </Card>
+          <div
+            key={title}
+            className="group rounded-xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md hover:shadow-primary/5"
+          >
+            <span className="mb-3 flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+              <Icon className="size-4.5" />
+            </span>
+            <h2 className="mb-1.5 text-sm font-semibold">{title}</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          </div>
         ))}
       </div>
     </div>

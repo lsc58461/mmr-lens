@@ -1,8 +1,17 @@
 "use client";
 
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
@@ -37,7 +46,7 @@ export function MmrChart({
   const pad = Math.max(50, (max - min) * 0.2);
 
   return (
-    <ChartContainer config={chartConfig} className="h-56 w-full">
+    <ChartContainer config={chartConfig} className="h-64 w-full">
       <LineChart data={data} margin={{ left: 8, right: 8, top: 8 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis dataKey="game" tickLine={false} axisLine={false} fontSize={11} />
@@ -62,6 +71,20 @@ export function MmrChart({
             />
           }
         />
+        {currentPoints !== null && (
+          <ReferenceLine
+            y={currentPoints}
+            stroke="var(--muted-foreground)"
+            strokeDasharray="4 4"
+            strokeOpacity={0.5}
+            label={{
+              value: "현재 랭크",
+              position: "insideTopRight",
+              fontSize: 10,
+              fill: "var(--muted-foreground)",
+            }}
+          />
+        )}
         <Line
           dataKey="lobby"
           type="monotone"
@@ -89,6 +112,7 @@ export function MmrChart({
           connectNulls
           dot={false}
         />
+        <ChartLegend content={<ChartLegendContent />} />
       </LineChart>
     </ChartContainer>
   );

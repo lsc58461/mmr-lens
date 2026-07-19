@@ -1,7 +1,17 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Minus, SearchX } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Crosshair,
+  Minus,
+  SearchX,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { DeepRefine } from "@/components/deep-refine";
 import { MmrChart, type MmrChartPoint } from "@/components/mmr-chart";
+import { MmrScale } from "@/components/mmr-scale";
 import { SearchForm } from "@/components/search-form";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,11 +21,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { championIconUrl, getDDragonVersion } from "@/lib/ddragon";
 import { deepCacheKey, getDeepResult } from "@/lib/mmr/deep-jobs";
 import { estimateMmr } from "@/lib/mmr/estimate";
 import { TIER_COLORS } from "@/lib/mmr/rank";
-import { RiotApiError, PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
+import { recordSearch } from "@/lib/recent";
+import {
+  RiotApiError,
+  PLATFORM_LABELS,
+  type PlatformRegion,
+} from "@/lib/riot/types";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +50,15 @@ function gapVerdict(gap: number): { text: string; tone: "up" | "down" | "flat" }
   if (gap <= -50)
     return { text: "티어보다 약간 낮은 매칭이에요.", tone: "down" };
   return { text: "티어와 실제 MMR이 잘 맞아떨어져요.", tone: "flat" };
+}
+
+function timeAgo(ts: number): string {
+  const hours = Math.floor((Date.now() - ts) / 3_600_000);
+  if (hours < 1) return "방금 전";
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}일 전`;
+  return `${Math.floor(days / 30)}개월 전`;
 }
 
 function ErrorCard({ title, description }: { title: string; description: string }) {
@@ -106,6 +130,19 @@ export default async function SummonerPage({
     throw e;
   }
 
+  const ddVersion = await getDDragonVersion();
+
+  await recordSearch({
+    region: region as PlatformRegion,
+    gameName: result.account.gameName,
+    tagLine: result.account.tagLine,
+    currentLabel: result.currentRank?.label ?? null,
+    currentTier: result.currentRank?.tier ?? null,
+    estimatedLabel: result.estimatedRank?.label ?? null,
+    estimatedTier: result.estimatedRank?.tier ?? null,
+    estimatedPoints: result.estimatedPoints,
+  });
+
   const {
     account,
     soloEntry,
@@ -131,95 +168,149 @@ export default async function SummonerPage({
     }));
 
   const verdict = gap !== null ? gapVerdict(gap) : null;
+  const estColor = estimatedRank ? TIER_COLORS[estimatedRank.tier] : undefined;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* 헤더 */}
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">
-              {account.gameName}
-              <span className="text-muted-foreground">#{account.tagLine}</span>
-            </h1>
-            <Badge variant="secondary">{PLATFORM_LABELS[region as PlatformRegion]}</Badge>
-            <DeepRefine
-              region={region}
-              gameName={gameName}
-              tagLine={tagLine}
-              mode={mode}
-            />
-          </div>
-          {soloEntry && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              시즌 {soloEntry.wins}승 {soloEntry.losses}패 (
-              {Math.round((soloEntry.wins / (soloEntry.wins + soloEntry.losses)) * 100)}
-              %)
-            </p>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">
+            {account.gameName}
+            <span className="font-normal text-muted-foreground">
+              #{account.tagLine}
+            </span>
+          </h1>
+          <Badge variant="secondary">
+            {PLATFORM_LABELS[region as PlatformRegion]}
+          </Badge>
+          <DeepRefine
+            region={region}
+            gameName={gameName}
+            tagLine={tagLine}
+            mode={mode}
+          />
         </div>
         <div className="w-full sm:w-80">
           <SearchForm compact />
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
+      {/* 히어로: 추정 MMR 쇼케이스 + 현재 티어 */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        <Card
+          className="relative overflow-hidden lg:col-span-3"
+          style={
+            estColor
+              ? {
+                  backgroundImage: `radial-gradient(120% 150% at 0% 0%, color-mix(in oklab, ${estColor} 18%, transparent), transparent 60%)`,
+                }
+              : undefined
+          }
+        >
+          <CardHeader>
+            <CardDescription className="flex items-center justify-between">
+              추정 MMR
+              <Badge variant="outline" className="bg-background/60 font-normal">
+                {CONFIDENCE_LABELS[confidence]}
+              </Badge>
+            </CardDescription>
+            <CardTitle className="text-3xl" style={{ color: estColor }}>
+              {estimatedRank?.label ?? "표본 부족"}
+            </CardTitle>
+            {estimatedPoints !== null && (
+              <p className="text-sm text-muted-foreground">
+                {Math.round(estimatedPoints).toLocaleString()}pt
+                {errorMargin !== null && ` · 오차범위 ±${errorMargin}pt`}
+              </p>
+            )}
+          </CardHeader>
+          {verdict && (
+            <CardContent>
+              <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-2.5 text-sm backdrop-blur-sm">
+                {verdict.tone === "up" && (
+                  <ArrowUp className="size-4 shrink-0 text-emerald-500" />
+                )}
+                {verdict.tone === "down" && (
+                  <ArrowDown className="size-4 shrink-0 text-red-500" />
+                )}
+                {verdict.tone === "flat" && (
+                  <Minus className="size-4 shrink-0 text-muted-foreground" />
+                )}
+                <span>{verdict.text}</span>
+                {gap !== null && (
+                  <span className="ml-auto shrink-0 font-semibold tabular-nums">
+                    {gap > 0 ? "+" : ""}
+                    {gap}pt
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardDescription>현재 티어</CardDescription>
             <CardTitle
-              className="text-xl"
-              style={currentRank ? { color: TIER_COLORS[currentRank.tier] } : undefined}
+              className="text-2xl"
+              style={
+                currentRank ? { color: TIER_COLORS[currentRank.tier] } : undefined
+              }
             >
               {currentRank?.label ?? "언랭크"}
             </CardTitle>
           </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription className="flex items-center justify-between">
-              추정 MMR
-              <Badge variant="outline" className="font-normal">
-                {CONFIDENCE_LABELS[confidence]}
-              </Badge>
-            </CardDescription>
-            <CardTitle
-              className="text-xl"
-              style={estimatedRank ? { color: TIER_COLORS[estimatedRank.tier] } : undefined}
-            >
-              {estimatedRank?.label ?? "표본 부족"}
-              {estimatedPoints !== null && (
-                <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-                  {Math.round(estimatedPoints).toLocaleString()}pt
-                  {errorMargin !== null && ` ±${errorMargin}`}
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription>티어 대비 판독</CardDescription>
-            <CardTitle className="flex items-center gap-1.5 text-xl">
-              {verdict?.tone === "up" && <ArrowUp className="size-5 text-emerald-500" />}
-              {verdict?.tone === "down" && <ArrowDown className="size-5 text-red-500" />}
-              {verdict?.tone === "flat" && <Minus className="size-5 text-muted-foreground" />}
-              {gap !== null ? `${gap > 0 ? "+" : ""}${gap}pt` : "—"}
-            </CardTitle>
-          </CardHeader>
+          <CardContent className="space-y-2.5 text-sm">
+            {soloEntry && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <TrendingUp className="size-4" />
+                시즌 {soloEntry.wins}승 {soloEntry.losses}패 (
+                {Math.round(
+                  (soloEntry.wins / (soloEntry.wins + soloEntry.losses)) * 100,
+                )}
+                %)
+              </div>
+            )}
+            {recentWinrate !== null && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Crosshair className="size-4" />
+                최근 {matches.length}경기 승률{" "}
+                {Math.round(recentWinrate * 100)}%
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Users className="size-4" />
+              표본 {sampledPlayers}명의 현재 랭크 분석
+            </div>
+          </CardContent>
         </Card>
       </div>
 
-      {verdict && <p className="text-sm text-muted-foreground">{verdict.text}</p>}
+      {/* 판독기 스케일 */}
+      {(currentPoints !== null || estimatedPoints !== null) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">티어 스펙트럼 판독</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MmrScale
+              currentPoints={currentPoints}
+              estimatedPoints={
+                estimatedPoints !== null ? Math.round(estimatedPoints) : null
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
 
+      {/* 추이 차트 */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">경기별 로비 평균 MMR</CardTitle>
+          <CardTitle className="text-base">경기별 MMR 추이</CardTitle>
           <CardDescription>
-            최근 {matches.length}경기(리메이크 제외)에서 만난 플레이어{" "}
-            {sampledPlayers}명의 현재 랭크 기준 · 점 색상은 승(파랑)/패(빨강) ·
-            점선은 경기별 추정 MMR 궤적
-            {recentWinrate !== null &&
-              ` · 최근 승률 ${Math.round(recentWinrate * 100)}%`}
+            최근 {matches.length}경기(리메이크 제외) 기준 · 점 색상은
+            승(파랑)/패(빨강)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -233,48 +324,69 @@ export default async function SummonerPage({
         </CardContent>
       </Card>
 
+      {/* 매치 리스트 */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">분석에 사용된 경기</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-1">
-            {matches.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                최근 솔로랭크 기록이 없어요.
-              </p>
-            )}
-            {matches.map((m, i) => (
-              <div key={m.matchId}>
-                {i > 0 && <Separator className="my-1" />}
-                <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
-                  <div className="flex items-center gap-3">
-                    <Badge
-                      variant={m.win ? "default" : "destructive"}
-                      className="w-9 justify-center"
-                    >
-                      {m.win ? "승" : "패"}
-                    </Badge>
-                    <span className="font-medium">{m.championName}</span>
-                    <span className="text-muted-foreground">{m.kda}</span>
-                  </div>
-                  <div className="text-right text-muted-foreground">
-                    {m.lobbyPoints !== null ? (
-                      <>
-                        로비 평균{" "}
-                        <span className="font-medium text-foreground">
-                          {Math.round(m.lobbyPoints)}pt
-                        </span>
-                        <span className="ml-1 text-xs">({m.sampleSize}명 표본)</span>
-                      </>
-                    ) : (
-                      "표본 없음"
-                    )}
-                  </div>
+        <CardContent className="space-y-1.5">
+          {matches.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              최근 솔로랭크 기록이 없어요.
+            </p>
+          )}
+          {matches.map((m) => (
+            <div
+              key={m.matchId}
+              className={`flex items-center gap-3 rounded-lg border-l-3 px-3 py-2 text-sm transition-colors ${
+                m.win
+                  ? "border-l-chart-1 bg-chart-1/6 hover:bg-chart-1/10"
+                  : "border-l-destructive bg-destructive/6 hover:bg-destructive/10"
+              }`}
+            >
+              {m.championName ? (
+                <Image
+                  src={championIconUrl(ddVersion, m.championName)}
+                  alt={m.championName}
+                  width={36}
+                  height={36}
+                  className="rounded-md"
+                  unoptimized
+                />
+              ) : (
+                <div className="size-9 rounded-md bg-muted" />
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate font-medium">{m.championName}</span>
+                  <span
+                    className={`text-xs font-semibold ${
+                      m.win ? "text-chart-1" : "text-destructive"
+                    }`}
+                  >
+                    {m.win ? "승리" : "패배"}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {m.kda} · {timeAgo(m.gameCreation)}
                 </div>
               </div>
-            ))}
-          </div>
+              <div className="ml-auto shrink-0 text-right">
+                {m.lobbyPoints !== null ? (
+                  <>
+                    <div className="font-medium tabular-nums">
+                      {Math.round(m.lobbyPoints).toLocaleString()}pt
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      로비 평균 · {m.sampleSize}명
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-xs text-muted-foreground">표본 없음</span>
+                )}
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
 

@@ -9,6 +9,7 @@ import {
   Users,
 } from "lucide-react";
 import { DeepRefine } from "@/components/deep-refine";
+import { MatchList, type MatchRow } from "@/components/match-list";
 import { MmrChart, type MmrChartPoint } from "@/components/mmr-chart";
 import { MmrScale } from "@/components/mmr-scale";
 import { SearchForm } from "@/components/search-form";
@@ -35,7 +36,7 @@ import {
   saveQuickResult,
 } from "@/lib/mmr/deep-jobs";
 import { estimateMmr } from "@/lib/mmr/estimate";
-import { TIER_COLORS } from "@/lib/mmr/rank";
+import { pointsToRank, TIER_COLORS } from "@/lib/mmr/rank";
 import { recordSearch } from "@/lib/recent";
 import { getAccountByRiotId, getSummoner } from "@/lib/riot/client";
 import {
@@ -296,38 +297,42 @@ export default async function SummonerPage({
               : undefined
           }
         >
-          {estimatedRank && (
-            // div 래핑 필수: 카드 첫 자식이 img면 has-[>img:first-child]:pt-0 규칙에 걸려 상단 패딩이 사라진다
-            <div className="pointer-events-none absolute -right-3 -top-1 sm:top-1/2 sm:-translate-y-1/2">
-              <Image
-                src={tierEmblemUrl(estimatedRank.tier)}
-                alt=""
-                width={192}
-                height={192}
-                unoptimized
-                className="size-32 scale-110 object-contain opacity-95 drop-shadow-xl sm:size-44"
-              />
+          <CardHeader>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 space-y-1.5">
+                <CardDescription className="flex flex-wrap items-center gap-2">
+                  추정 MMR
+                  <Badge variant="outline" className="bg-background/60 font-normal">
+                    {CONFIDENCE_LABELS[confidence]}
+                  </Badge>
+                </CardDescription>
+                <CardTitle
+                  className="text-2xl sm:text-3xl"
+                  style={{ color: estColor }}
+                >
+                  {estimatedRank?.label ?? "표본 부족"}
+                </CardTitle>
+                {estimatedPoints !== null && (
+                  <p className="text-sm text-muted-foreground">
+                    {Math.round(estimatedPoints).toLocaleString()}pt
+                    {errorMargin !== null && ` · 오차범위 ±${errorMargin}pt`}
+                  </p>
+                )}
+              </div>
+              {estimatedRank && (
+                <Image
+                  src={tierEmblemUrl(estimatedRank.tier)}
+                  alt=""
+                  width={208}
+                  height={208}
+                  unoptimized
+                  className="-my-6 -mr-3 size-32 shrink-0 object-contain drop-shadow-xl sm:size-44"
+                />
+              )}
             </div>
-          )}
-          <CardHeader className="relative pr-24 sm:pr-40">
-            <CardDescription className="flex flex-wrap items-center gap-2">
-              추정 MMR
-              <Badge variant="outline" className="bg-background/60 font-normal">
-                {CONFIDENCE_LABELS[confidence]}
-              </Badge>
-            </CardDescription>
-            <CardTitle className="text-2xl sm:text-3xl" style={{ color: estColor }}>
-              {estimatedRank?.label ?? "표본 부족"}
-            </CardTitle>
-            {estimatedPoints !== null && (
-              <p className="text-sm text-muted-foreground">
-                {Math.round(estimatedPoints).toLocaleString()}pt
-                {errorMargin !== null && ` · 오차범위 ±${errorMargin}pt`}
-              </p>
-            )}
           </CardHeader>
           {verdict && (
-            <CardContent className="relative z-10">
+            <CardContent>
               <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-2.5 text-xs backdrop-blur-sm sm:text-sm">
                 {verdict.tone === "up" && (
                   <ArrowUp className="size-4 shrink-0 text-emerald-500" />
@@ -430,67 +435,36 @@ export default async function SummonerPage({
       <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-[400ms] fill-mode-backwards">
         <CardHeader>
           <CardTitle className="text-base">분석에 사용된 경기</CardTitle>
+          <CardDescription>최근 솔로랭크 {matches.length}경기</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-1.5">
-          {matches.length === 0 && (
+        <CardContent>
+          {matches.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
               최근 솔로랭크 기록이 없어요.
             </p>
+          ) : (
+            <MatchList
+              rows={matches.map((m): MatchRow => {
+                const lobby =
+                  m.lobbyPoints !== null
+                    ? pointsToRank(Math.round(m.lobbyPoints))
+                    : null;
+                return {
+                  id: m.matchId,
+                  win: m.win,
+                  iconUrl: m.championName
+                    ? championIconUrl(ddVersion, m.championName)
+                    : null,
+                  champName: championNameKo(champNames, m.championName),
+                  kda: m.kda,
+                  when: timeAgo(m.gameCreation),
+                  lobbyLabel: lobby?.label ?? null,
+                  lobbyTier: lobby?.tier ?? null,
+                  sampleSize: m.sampleSize,
+                };
+              })}
+            />
           )}
-          {matches.map((m) => (
-            <div
-              key={m.matchId}
-              className={`flex items-center gap-3 rounded-lg border-l-3 px-3 py-2 text-sm transition-colors ${
-                m.win
-                  ? "border-l-chart-1 bg-chart-1/6 hover:bg-chart-1/10"
-                  : "border-l-destructive bg-destructive/6 hover:bg-destructive/10"
-              }`}
-            >
-              {m.championName ? (
-                <Image
-                  src={championIconUrl(ddVersion, m.championName)}
-                  alt={m.championName}
-                  width={36}
-                  height={36}
-                  className="rounded-md"
-                  unoptimized
-                />
-              ) : (
-                <div className="size-9 rounded-md bg-muted" />
-              )}
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-medium">
-                    {championNameKo(champNames, m.championName)}
-                  </span>
-                  <span
-                    className={`text-xs font-semibold ${
-                      m.win ? "text-chart-1" : "text-destructive"
-                    }`}
-                  >
-                    {m.win ? "승리" : "패배"}
-                  </span>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {m.kda} · {timeAgo(m.gameCreation)}
-                </div>
-              </div>
-              <div className="ml-auto shrink-0 text-right">
-                {m.lobbyPoints !== null ? (
-                  <>
-                    <div className="font-medium tabular-nums">
-                      {Math.round(m.lobbyPoints).toLocaleString()}pt
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      로비 평균 · {m.sampleSize}명
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-xs text-muted-foreground">표본 없음</span>
-                )}
-              </div>
-            </div>
-          ))}
         </CardContent>
       </Card>
 

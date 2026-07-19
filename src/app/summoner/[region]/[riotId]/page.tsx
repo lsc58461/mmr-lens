@@ -321,8 +321,7 @@ export default async function SummonerPage({
         <CardHeader>
           <CardTitle className="text-base">경기별 MMR 추이</CardTitle>
           <CardDescription>
-            최근 {matches.length}경기(리메이크 제외) 기준 · 점 색상은
-            승(파랑)/패(빨강)
+            최근 {matches.length}경기(리메이크 제외) 기준
           </CardDescription>
         </CardHeader>
         <CardContent>

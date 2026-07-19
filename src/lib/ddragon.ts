@@ -35,9 +35,9 @@ export function profileIconUrl(version: string, iconId: number): string {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${iconId}.png`;
 }
 
-/** 티어 엠블럼 (CommunityDragon 정적 에셋) */
+/** 티어 엠블럼 — CommunityDragon 원본의 투명 여백을 잘라내 public/에 저장해둔 로컬 에셋 */
 export function tierEmblemUrl(tier: string): string {
-  return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tier.toLowerCase()}.png`;
+  return `/ranked-emblems/${tier.toLowerCase()}.png`;
 }
 
 /** 챔피언 영문 키 → 한글 이름 매핑 (예: MonkeyKing → 오공) */

@@ -86,13 +86,13 @@ export function getRankedMatchIds(
   );
 }
 
-/** 매치 상세. 종료된 매치는 불변이므로 길게 캐시한다 */
+/** 매치 상세. 종료된 매치는 불변이므로 사실상 무기한 캐시한다 */
 export function getMatch(
   platform: PlatformRegion,
   matchId: string,
 ): Promise<MatchInfo> {
   const routing = PLATFORM_TO_ROUTING[platform];
-  return cached(`match:${matchId}`, 60 * 60 * 24 * 7, async () => {
+  return cached(`match:${matchId}`, 60 * 60 * 24 * 365, async () => {
     const raw = await riotFetch<{
       info: {
         gameCreation: number;

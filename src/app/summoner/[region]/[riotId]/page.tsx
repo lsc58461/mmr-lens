@@ -9,10 +9,11 @@ import {
   Users,
 } from "lucide-react";
 import { DeepRefine } from "@/components/deep-refine";
+import { LobbyDistribution } from "@/components/lobby-distribution";
 import { MatchList, type MatchRow } from "@/components/match-list";
 import { MmrChart, type MmrChartPoint } from "@/components/mmr-chart";
-import { MmrScale } from "@/components/mmr-scale";
 import { SearchForm } from "@/components/search-form";
+import { ShareButton } from "@/components/share-button";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -46,6 +47,26 @@ import {
 } from "@/lib/riot/types";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ region: string; riotId: string }>;
+}) {
+  const { region, riotId } = await params;
+  const decoded = decodeURIComponent(riotId);
+  const title = `${decoded} 숨겨진 MMR — MMR Lens`;
+  const image = `/api/share-image?region=${region}&riotId=${encodeURIComponent(decoded)}`;
+  return {
+    title,
+    openGraph: {
+      title,
+      description: "최근 경기 로비 랭크 역추적으로 추정한 숨겨진 MMR",
+      images: [{ url: image, width: 1200, height: 630 }],
+    },
+    twitter: { card: "summary_large_image", images: [image] },
+  };
+}
 
 const CONFIDENCE_LABELS = {
   high: "신뢰도 높음",
@@ -314,6 +335,7 @@ export default async function SummonerPage({
               tagLine={tagLine}
               mode={mode}
             />
+            <ShareButton region={region} riotId={decoded} />
           </div>
         </div>
         <div className="w-full sm:w-80">
@@ -435,19 +457,17 @@ export default async function SummonerPage({
         </Card>
       </div>
 
-      {/* 판독기 스케일 */}
-      {(currentPoints !== null || estimatedPoints !== null) && (
+      {/* 로비 티어 분포 */}
+      {matches.some((m) => m.lobbyPoints !== null) && (
         <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-200 fill-mode-backwards">
           <CardHeader>
-            <CardTitle className="text-base">티어 스펙트럼 판독</CardTitle>
+            <CardTitle className="text-base">로비 티어 분포</CardTitle>
+            <CardDescription>
+              최근 경기들의 로비 평균 랭크가 속한 티어
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <MmrScale
-              currentPoints={currentPoints}
-              estimatedPoints={
-                estimatedPoints !== null ? Math.round(estimatedPoints) : null
-              }
-            />
+            <LobbyDistribution matches={matches} />
           </CardContent>
         </Card>
       )}

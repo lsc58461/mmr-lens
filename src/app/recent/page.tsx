@@ -51,14 +51,14 @@ export default async function RecentPage() {
               className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-all hover:-translate-y-px hover:border-primary/40 hover:shadow-md hover:shadow-primary/5"
             >
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate font-semibold">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 truncate font-semibold">
                     {e.gameName}
                     <span className="font-normal text-muted-foreground">
                       #{e.tagLine}
                     </span>
                   </span>
-                  <Badge variant="secondary" className="text-[10px]">
+                  <Badge variant="secondary" className="shrink-0 text-[10px]">
                     {PLATFORM_LABELS[e.region]}
                   </Badge>
                 </div>

@@ -18,7 +18,8 @@ export function MmrScale({
   const lo = Math.max(0, Math.floor((Math.min(...pts) - 250) / 400) * 400);
   const hi = Math.ceil((Math.max(...pts) + 250) / 400) * 400;
   const span = hi - lo;
-  const pos = (v: number) => ((Math.min(Math.max(v, lo), hi) - lo) / span) * 100;
+  const pos = (v: number) =>
+    ((Math.min(Math.max(v, lo), hi) - lo) / span) * 100;
 
   const segments: { start: number; tier: string }[] = [];
   for (let p = lo; p < hi; p += 400) {
@@ -63,20 +64,6 @@ export function MmrScale({
             </div>
           ))}
         </div>
-
-        {/* 마커 세로선 — 바를 관통해 정확한 위치를 보여준다 */}
-        {estimatedPoints !== null && (
-          <div
-            className="absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 rounded-full bg-chart-2 shadow-[0_0_0_1.5px_var(--background)]"
-            style={{ left: `${pos(estimatedPoints)}%` }}
-          />
-        )}
-        {currentPoints !== null && (
-          <div
-            className="absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_0_1.5px_var(--background)]"
-            style={{ left: `${pos(currentPoints)}%` }}
-          />
-        )}
       </div>
     </div>
   );

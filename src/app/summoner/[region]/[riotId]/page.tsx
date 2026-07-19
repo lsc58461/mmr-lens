@@ -53,13 +53,25 @@ const CONFIDENCE_LABELS = {
   low: "신뢰도 낮음",
 } as const;
 
-function gapVerdict(gap: number): { text: string; tone: "up" | "down" | "flat" } {
+function gapVerdict(gap: number): {
+  text: string;
+  tone: "up" | "down" | "flat";
+} {
   if (gap >= 150)
-    return { text: "티어보다 훨씬 높은 실력대에서 매칭되고 있어요. 승급 가도!", tone: "up" };
+    return {
+      text: "티어보다 훨씬 높은 실력대에서 매칭되고 있어요. 승급 가도!",
+      tone: "up",
+    };
   if (gap >= 50)
-    return { text: "티어보다 한 단계 높은 매칭이에요. LP를 잘 받고 있을 거예요.", tone: "up" };
+    return {
+      text: "티어보다 한 단계 높은 매칭이에요. LP를 잘 받고 있을 거예요.",
+      tone: "up",
+    };
   if (gap <= -150)
-    return { text: "현재 티어보다 낮은 실력대에서 매칭되고 있어요. LP 효율이 나쁠 수 있어요.", tone: "down" };
+    return {
+      text: "현재 티어보다 낮은 실력대에서 매칭되고 있어요. LP 효율이 나쁠 수 있어요.",
+      tone: "down",
+    };
   if (gap <= -50)
     return { text: "티어보다 약간 낮은 매칭이에요.", tone: "down" };
   return { text: "티어와 실제 MMR이 잘 맞아떨어져요.", tone: "flat" };
@@ -109,7 +121,13 @@ function WinrateRing({ pct, games }: { pct: number; games: number }) {
   );
 }
 
-function ErrorCard({ title, description }: { title: string; description: string }) {
+function ErrorCard({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center gap-6 py-16 text-center">
       <SearchX className="size-10 text-muted-foreground" />
@@ -118,7 +136,10 @@ function ErrorCard({ title, description }: { title: string; description: string 
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       <SearchForm compact />
-      <Link href="/" className="text-sm text-primary underline-offset-4 hover:underline">
+      <Link
+        href="/"
+        className="text-sm text-primary underline-offset-4 hover:underline"
+      >
         홈으로 돌아가기
       </Link>
     </div>
@@ -132,7 +153,12 @@ export default async function SummonerPage({
 }) {
   const { region, riotId } = await params;
   if (!(region in PLATFORM_LABELS)) {
-    return <ErrorCard title="지원하지 않는 지역이에요" description="지역을 다시 선택해 주세요." />;
+    return (
+      <ErrorCard
+        title="지원하지 않는 지역이에요"
+        description="지역을 다시 선택해 주세요."
+      />
+    );
   }
   const decoded = decodeURIComponent(riotId);
   const hashIndex = decoded.lastIndexOf("#");
@@ -154,12 +180,22 @@ export default async function SummonerPage({
   let mode: "quick" | "deep" = "quick";
   try {
     const latestMatchId = await getLatestMatchId(platform, gameName, tagLine);
-    const deep = await getFreshDeepResult(platform, gameName, tagLine, latestMatchId);
+    const deep = await getFreshDeepResult(
+      platform,
+      gameName,
+      tagLine,
+      latestMatchId,
+    );
     if (deep) {
       result = deep;
       mode = "deep";
     } else {
-      result = await getFreshQuickResult(platform, gameName, tagLine, latestMatchId);
+      result = await getFreshQuickResult(
+        platform,
+        gameName,
+        tagLine,
+        latestMatchId,
+      );
       if (!result) {
         result = await estimateMmr(platform, gameName, tagLine);
         await saveQuickResult(platform, gameName, tagLine, result);
@@ -302,7 +338,10 @@ export default async function SummonerPage({
               <div className="min-w-0 space-y-1.5">
                 <CardDescription className="flex flex-wrap items-center gap-2">
                   추정 MMR
-                  <Badge variant="outline" className="bg-background/60 font-normal">
+                  <Badge
+                    variant="outline"
+                    className="bg-background/60 font-normal"
+                  >
                     {CONFIDENCE_LABELS[confidence]}
                   </Badge>
                 </CardDescription>
@@ -320,7 +359,7 @@ export default async function SummonerPage({
                 )}
               </div>
               {estimatedRank && (
-                <div className="relative -my-6 -mr-3 size-28 shrink-0 sm:size-36">
+                <div className="relative size-22 shrink-0 sm:size-30">
                   <Image
                     src={tierEmblemUrl(estimatedRank.tier)}
                     alt=""

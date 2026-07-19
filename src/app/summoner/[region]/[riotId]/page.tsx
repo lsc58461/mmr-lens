@@ -297,14 +297,17 @@ export default async function SummonerPage({
           }
         >
           {estimatedRank && (
-            <Image
-              src={tierEmblemUrl(estimatedRank.tier)}
-              alt=""
-              width={192}
-              height={192}
-              unoptimized
-              className="pointer-events-none absolute -right-3 -top-1 size-32 scale-110 object-contain opacity-95 drop-shadow-xl sm:size-44"
-            />
+            // div 래핑 필수: 카드 첫 자식이 img면 has-[>img:first-child]:pt-0 규칙에 걸려 상단 패딩이 사라진다
+            <div className="pointer-events-none absolute -right-3 -top-1 sm:top-1/2 sm:-translate-y-1/2">
+              <Image
+                src={tierEmblemUrl(estimatedRank.tier)}
+                alt=""
+                width={192}
+                height={192}
+                unoptimized
+                className="size-32 scale-110 object-contain opacity-95 drop-shadow-xl sm:size-44"
+              />
+            </div>
           )}
           <CardHeader className="relative pr-24 sm:pr-40">
             <CardDescription className="flex flex-wrap items-center gap-2">

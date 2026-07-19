@@ -16,12 +16,19 @@ import {
 import type { LeagueEntry, MatchInfo, PlatformRegion } from "@/lib/riot/types";
 import { pointsToRank, rankToPoints, type RankLabel } from "./rank";
 
-const MATCH_FETCH_COUNT = 10; // 리메이크 제외분을 감안해 여유 있게 조회
-const MATCH_COUNT = 8; // 실제 분석할 경기 수
 const MIN_GAME_DURATION = 300; // 5분 미만은 리메이크로 간주하고 제외
-const SAMPLES_PER_TEAM = 3; // 매치당 팀별 랭크 조회 인원 (3+3 = 매치당 6회 호출)
 const OBS_WEIGHT = 0.35; // 로비 평균(매치메이커 관측)을 레이팅에 반영하는 비율
 const ELO_K = 32; // Elo 승패 업데이트 K-팩터 (디비전 100pt 스케일 기준)
+
+export interface AnalysisDepth {
+  matches: number; // 분석할 경기 수
+  samplesPerTeam: number; // 매치당 팀별 랭크 조회 인원
+}
+
+// 빠른 추정: 개발 키(2분당 100회)로도 수 초 안에 끝나는 표본
+export const QUICK_DEPTH: AnalysisDepth = { matches: 8, samplesPerTeam: 3 };
+// 정밀 분석: 20경기 × 본인 제외 전원(내 팀 4 + 상대 팀 5)
+export const DEEP_DEPTH: AnalysisDepth = { matches: 20, samplesPerTeam: 5 };
 
 export interface MatchSample {
   matchId: string;
@@ -54,7 +61,11 @@ function soloQueueEntry(entries: LeagueEntry[]): LeagueEntry | null {
 }
 
 /** 매치에서 본인을 제외하고 팀별로 고르게 참가자를 샘플링 */
-function sampleParticipants(match: MatchInfo, selfPuuid: string) {
+function sampleParticipants(
+  match: MatchInfo,
+  selfPuuid: string,
+  samplesPerTeam: number,
+) {
   const others = match.participants.filter((p) => p.puuid !== selfPuuid);
   const byTeam = new Map<number, typeof others>();
   for (const p of others) {
@@ -62,7 +73,7 @@ function sampleParticipants(match: MatchInfo, selfPuuid: string) {
     list.push(p);
     byTeam.set(p.teamId, list);
   }
-  return [...byTeam.values()].flatMap((team) => team.slice(0, SAMPLES_PER_TEAM));
+  return [...byTeam.values()].flatMap((team) => team.slice(0, samplesPerTeam));
 }
 
 /** 절사평균: 표본이 5명 이상이면 최고/최저 1명씩 제외 (부캐·복귀 유저 이상치 완화) */
@@ -77,11 +88,15 @@ export async function estimateMmr(
   platform: PlatformRegion,
   gameName: string,
   tagLine: string,
+  depth: AnalysisDepth = QUICK_DEPTH,
+  onProgress?: (done: number, total: number) => void,
 ): Promise<MmrEstimate> {
+  // 리메이크 제외분을 감안해 여유 있게 조회
+  const fetchCount = Math.min(depth.matches + Math.ceil(depth.matches / 4), 100);
   const account = await getAccountByRiotId(platform, gameName, tagLine);
   const [entries, matchIds] = await Promise.all([
     getLeagueEntries(platform, account.puuid),
-    getRankedMatchIds(platform, account.puuid, MATCH_FETCH_COUNT),
+    getRankedMatchIds(platform, account.puuid, fetchCount),
   ]);
 
   const solo = soloQueueEntry(entries);
@@ -94,13 +109,16 @@ export async function estimateMmr(
   );
   const matches = allMatches
     .filter((m) => m.gameDuration >= MIN_GAME_DURATION)
-    .slice(0, MATCH_COUNT);
+    .slice(0, depth.matches);
 
   // 조회할 참가자 puuid를 매치 전체에서 모아 중복 제거 후 한 번씩만 조회
-  const sampledByMatch = matches.map((m) => sampleParticipants(m, account.puuid));
+  const sampledByMatch = matches.map((m) =>
+    sampleParticipants(m, account.puuid, depth.samplesPerTeam),
+  );
   const uniquePuuids = [...new Set(sampledByMatch.flat().map((p) => p.puuid))];
 
   const pointsByPuuid = new Map<string, number>();
+  let progressDone = 0;
   await Promise.all(
     uniquePuuids.map(async (puuid) => {
       try {
@@ -113,6 +131,8 @@ export async function estimateMmr(
         }
       } catch {
         // 일부 참가자 조회 실패는 표본에서 제외하고 계속 진행
+      } finally {
+        onProgress?.(++progressDone, uniquePuuids.length);
       }
     }),
   );

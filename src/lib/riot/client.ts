@@ -18,10 +18,18 @@ async function riotFetch<T>(url: string): Promise<T> {
 
   for (let attempt = 0; attempt < 3; attempt++) {
     await riotLimiter.acquire();
-    const res = await fetch(url, {
-      headers: { "X-Riot-Token": apiKey },
-      cache: "no-store",
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        headers: { "X-Riot-Token": apiKey },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      // 커넥션 정체/타임아웃 — 잠시 후 재시도
+      await sleep(500 * (attempt + 1));
+      continue;
+    }
     if (res.ok) return res.json() as Promise<T>;
     if (res.status === 429) {
       const retryAfter = Number(res.headers.get("Retry-After") ?? "2");

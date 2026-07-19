@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Minus, SearchX } from "lucide-react";
+import { DeepRefine } from "@/components/deep-refine";
 import { MmrChart, type MmrChartPoint } from "@/components/mmr-chart";
 import { SearchForm } from "@/components/search-form";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { deepCacheKey, getDeepResult } from "@/lib/mmr/deep-jobs";
 import { estimateMmr } from "@/lib/mmr/estimate";
 import { TIER_COLORS } from "@/lib/mmr/rank";
 import { RiotApiError, PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
@@ -73,9 +75,17 @@ export default async function SummonerPage({
   const gameName = decoded.slice(0, hashIndex);
   const tagLine = decoded.slice(hashIndex + 1);
 
+  // 정밀 분석 결과가 캐시에 있으면 그것을, 없으면 빠른 추정을 사용
   let result;
+  let mode: "quick" | "deep" = "quick";
   try {
-    result = await estimateMmr(region as PlatformRegion, gameName, tagLine);
+    const deep = await getDeepResult(deepCacheKey(region, gameName, tagLine));
+    if (deep) {
+      result = deep;
+      mode = "deep";
+    } else {
+      result = await estimateMmr(region as PlatformRegion, gameName, tagLine);
+    }
   } catch (e) {
     if (e instanceof RiotApiError && e.status === 404) {
       return (
@@ -126,12 +136,18 @@ export default async function SummonerPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">
               {account.gameName}
               <span className="text-muted-foreground">#{account.tagLine}</span>
             </h1>
             <Badge variant="secondary">{PLATFORM_LABELS[region as PlatformRegion]}</Badge>
+            <DeepRefine
+              region={region}
+              gameName={gameName}
+              tagLine={tagLine}
+              mode={mode}
+            />
           </div>
           {soloEntry && (
             <p className="mt-1 text-sm text-muted-foreground">

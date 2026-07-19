@@ -41,8 +41,15 @@ class RateLimiter {
   }
 }
 
-// 실제 한도보다 약간 보수적으로 잡아 429를 예방한다
-export const riotLimiter = new RateLimiter([
-  { capacity: 18, windowMs: 1_000 },
-  { capacity: 95, windowMs: 120_000 },
-]);
+// 실제 한도보다 약간 보수적으로 잡아 429를 예방한다.
+// RIOT_KEY_TYPE=prod 이면 Production 키 한도(500/10s, 30000/10min) 기준으로 동작한다.
+export const riotLimiter =
+  process.env.RIOT_KEY_TYPE === "prod"
+    ? new RateLimiter([
+        { capacity: 450, windowMs: 10_000 },
+        { capacity: 27_000, windowMs: 600_000 },
+      ])
+    : new RateLimiter([
+        { capacity: 18, windowMs: 1_000 },
+        { capacity: 95, windowMs: 120_000 },
+      ]);

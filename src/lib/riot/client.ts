@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "crypto";
 import { riotLimiter } from "./limiter";
 import { cached } from "@/lib/cache";
 import {
@@ -11,6 +12,20 @@ import {
 } from "./types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// PUUID는 API 키 단위로 암호화되므로, 다른 키로 받아둔 PUUID가 섞이면
+// "Exception decrypting" 400이 난다. 캐시 키에 현재 키의 지문을 붙여
+// 키가 바뀌면 관련 캐시가 자동으로 무효화되게 한다(옛 행은 삭제하지 않음).
+let cachedFp: string | null = null;
+function keyFp(): string {
+  if (!cachedFp) {
+    cachedFp = createHash("sha256")
+      .update(process.env.RIOT_API_KEY ?? "")
+      .digest("hex")
+      .slice(0, 8);
+  }
+  return cachedFp;
+}
 
 async function riotFetch<T>(url: string): Promise<T> {
   const apiKey = process.env.RIOT_API_KEY;
@@ -52,7 +67,7 @@ export function getAccountByRiotId(
   tagLine: string,
 ): Promise<RiotAccount> {
   const routing = PLATFORM_TO_ROUTING[platform];
-  const key = `account:${routing}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
+  const key = `${keyFp()}:account:${routing}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
   return cached(key, 60 * 60 * 24, () =>
     riotFetch<RiotAccount>(
       `https://${routing}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
@@ -65,7 +80,7 @@ export function getLeagueEntries(
   platform: PlatformRegion,
   puuid: string,
 ): Promise<LeagueEntry[]> {
-  return cached(`league:${platform}:${puuid}`, 60 * 30, () =>
+  return cached(`${keyFp()}:league:${platform}:${puuid}`, 60 * 30, () =>
     riotFetch<LeagueEntry[]>(
       `https://${platform}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`,
     ),
@@ -79,7 +94,7 @@ export function getRankedMatchIds(
   count: number,
 ): Promise<string[]> {
   const routing = PLATFORM_TO_ROUTING[platform];
-  return cached(`matchids:${routing}:${puuid}:${count}`, 60 * 10, () =>
+  return cached(`${keyFp()}:matchids:${routing}:${puuid}:${count}`, 60 * 10, () =>
     riotFetch<string[]>(
       `https://${routing}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&type=ranked&start=0&count=${count}`,
     ),
@@ -92,7 +107,8 @@ export function getMatch(
   matchId: string,
 ): Promise<MatchInfo> {
   const routing = PLATFORM_TO_ROUTING[platform];
-  return cached(`match:${matchId}`, 60 * 60 * 24 * 365, async () => {
+  // 매치 상세도 참가자 puuid를 담고 있어 키 지문으로 스코프한다
+  return cached(`${keyFp()}:match:${matchId}`, 60 * 60 * 24 * 365, async () => {
     const raw = await riotFetch<{
       info: {
         gameCreation: number;

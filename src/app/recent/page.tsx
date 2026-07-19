@@ -48,7 +48,7 @@ export default async function RecentPage() {
             <Link
               key={`${e.region}:${e.gameName}#${e.tagLine}`}
               href={`/summoner/${e.region}/${encodeURIComponent(`${e.gameName}#${e.tagLine}`)}`}
-              className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 transition-all hover:-translate-y-px hover:border-primary/40 hover:shadow-md hover:shadow-primary/5"
+              className="group flex flex-col gap-2.5 rounded-xl border bg-card px-4 py-3 transition-all hover:-translate-y-px hover:border-primary/40 hover:shadow-md hover:shadow-primary/5 sm:flex-row sm:items-center sm:gap-3"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -67,7 +67,7 @@ export default async function RecentPage() {
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-3 text-right text-xs sm:gap-5 sm:text-sm">
+              <div className="flex shrink-0 items-center gap-5 text-left text-xs sm:text-right sm:text-sm">
                 <div>
                   <div className="text-[10px] text-muted-foreground">티어</div>
                   <div
@@ -101,7 +101,7 @@ export default async function RecentPage() {
                     )}
                   </div>
                 </div>
-                <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:ml-0" />
               </div>
             </Link>
           ))}

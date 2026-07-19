@@ -87,6 +87,18 @@ export function getLeagueEntries(
   );
 }
 
+/** 소환사 프로필(아이콘/레벨) 조회 */
+export function getSummoner(
+  platform: PlatformRegion,
+  puuid: string,
+): Promise<{ profileIconId: number; summonerLevel: number }> {
+  return cached(`${keyFp()}:summoner:${platform}:${puuid}`, 60 * 60 * 24, () =>
+    riotFetch<{ profileIconId: number; summonerLevel: number }>(
+      `https://${platform}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${puuid}`,
+    ),
+  );
+}
+
 /** 최근 솔로랭크 매치 ID 목록 */
 export function getRankedMatchIds(
   platform: PlatformRegion,

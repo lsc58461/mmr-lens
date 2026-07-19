@@ -26,7 +26,7 @@ const FEATURES = [
 export default function Home() {
   return (
     <div className="flex flex-col items-center gap-14 py-10 sm:py-20">
-      <div className="max-w-2xl space-y-5 text-center">
+      <div className="max-w-2xl space-y-5 text-center animate-in fade-in slide-in-from-bottom-3 duration-700">
         <Badge
           variant="outline"
           className="gap-1.5 rounded-full border-primary/30 bg-primary/5 px-3 py-1 text-primary"
@@ -48,11 +48,11 @@ export default function Home() {
         </p>
       </div>
 
-      <div className="w-full max-w-xl rounded-2xl border bg-card/80 p-5 shadow-lg shadow-primary/5 ring-1 ring-primary/10 backdrop-blur-sm sm:p-6">
+      <div className="w-full max-w-xl rounded-2xl border bg-card/80 p-5 shadow-lg shadow-primary/5 ring-1 ring-primary/10 backdrop-blur-sm sm:p-6 animate-in fade-in slide-in-from-bottom-3 duration-700 delay-150 fill-mode-backwards">
         <SearchForm />
       </div>
 
-      <div className="grid w-full gap-4 sm:grid-cols-3">
+      <div className="grid w-full gap-4 sm:grid-cols-3 animate-in fade-in slide-in-from-bottom-3 duration-700 delay-300 fill-mode-backwards">
         {FEATURES.map(({ icon: Icon, title, description }) => (
           <div
             key={title}

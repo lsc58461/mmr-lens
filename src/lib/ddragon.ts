@@ -30,3 +30,12 @@ export function championIconUrl(version: string, championName: string): string {
   const key = NAME_QUIRKS[championName] ?? championName;
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${key}.png`;
 }
+
+export function profileIconUrl(version: string, iconId: number): string {
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${iconId}.png`;
+}
+
+/** 티어 엠블럼 (CommunityDragon 정적 에셋) */
+export function tierEmblemUrl(tier: string): string {
+  return `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tier.toLowerCase()}.png`;
+}

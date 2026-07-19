@@ -3,7 +3,6 @@ import Link from "next/link";
 import {
   ArrowDown,
   ArrowUp,
-  Crosshair,
   Minus,
   SearchX,
   TrendingUp,
@@ -21,7 +20,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { championIconUrl, getDDragonVersion } from "@/lib/ddragon";
+import {
+  championIconUrl,
+  getDDragonVersion,
+  profileIconUrl,
+  tierEmblemUrl,
+} from "@/lib/ddragon";
 import {
   getFreshDeepResult,
   getFreshQuickResult,
@@ -31,6 +35,7 @@ import {
 import { estimateMmr } from "@/lib/mmr/estimate";
 import { TIER_COLORS } from "@/lib/mmr/rank";
 import { recordSearch } from "@/lib/recent";
+import { getAccountByRiotId, getSummoner } from "@/lib/riot/client";
 import {
   RiotApiError,
   PLATFORM_LABELS,
@@ -64,6 +69,41 @@ function timeAgo(ts: number): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}일 전`;
   return `${Math.floor(days / 30)}개월 전`;
+}
+
+function WinrateRing({ pct, games }: { pct: number; games: number }) {
+  const r = 20;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-0.5">
+      <div className="relative size-13">
+        <svg viewBox="0 0 48 48" className="size-full -rotate-90">
+          <circle
+            cx="24"
+            cy="24"
+            r={r}
+            fill="none"
+            strokeWidth="5"
+            className="stroke-muted"
+          />
+          <circle
+            cx="24"
+            cy="24"
+            r={r}
+            fill="none"
+            strokeWidth="5"
+            strokeLinecap="round"
+            stroke="var(--chart-1)"
+            strokeDasharray={`${c * pct} ${c}`}
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold tabular-nums">
+          {Math.round(pct * 100)}%
+        </span>
+      </div>
+      <span className="text-[10px] text-muted-foreground">최근 {games}판</span>
+    </div>
+  );
 }
 
 function ErrorCard({ title, description }: { title: string; description: string }) {
@@ -144,6 +184,20 @@ export default async function SummonerPage({
 
   const ddVersion = await getDDragonVersion();
 
+  // 저장된 이전 분석에는 프로필 정보가 없을 수 있어 보충 조회 (둘 다 캐시됨)
+  let profileIconId = result.profileIconId ?? null;
+  let summonerLevel = result.summonerLevel ?? null;
+  if (profileIconId === null) {
+    try {
+      const acct = await getAccountByRiotId(platform, gameName, tagLine);
+      const summoner = await getSummoner(platform, acct.puuid);
+      profileIconId = summoner.profileIconId;
+      summonerLevel = summoner.summonerLevel;
+    } catch {
+      // 프로필 조회 실패는 표시 생략으로 처리
+    }
+  }
+
   await recordSearch({
     region: platform,
     gameName: result.account.gameName,
@@ -185,23 +239,42 @@ export default async function SummonerPage({
   return (
     <div className="space-y-5">
       {/* 헤더 */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-            {account.gameName}
-            <span className="font-normal text-muted-foreground">
-              #{account.tagLine}
-            </span>
-          </h1>
-          <Badge variant="secondary">
-            {PLATFORM_LABELS[region as PlatformRegion]}
-          </Badge>
-          <DeepRefine
-            region={region}
-            gameName={gameName}
-            tagLine={tagLine}
-            mode={mode}
-          />
+      <div className="flex flex-wrap items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="flex items-center gap-3">
+          {profileIconId !== null && (
+            <div className="relative shrink-0">
+              <Image
+                src={profileIconUrl(ddVersion, profileIconId)}
+                alt=""
+                width={56}
+                height={56}
+                unoptimized
+                className="rounded-xl ring-2 ring-border"
+              />
+              {summonerLevel !== null && (
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border bg-background/95 px-1.5 text-[10px] font-medium tabular-nums">
+                  {summonerLevel}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+              {account.gameName}
+              <span className="font-normal text-muted-foreground">
+                #{account.tagLine}
+              </span>
+            </h1>
+            <Badge variant="secondary">
+              {PLATFORM_LABELS[region as PlatformRegion]}
+            </Badge>
+            <DeepRefine
+              region={region}
+              gameName={gameName}
+              tagLine={tagLine}
+              mode={mode}
+            />
+          </div>
         </div>
         <div className="w-full sm:w-80">
           <SearchForm compact />
@@ -209,7 +282,7 @@ export default async function SummonerPage({
       </div>
 
       {/* 히어로: 추정 MMR 쇼케이스 + 현재 티어 */}
-      <div className="grid gap-4 lg:grid-cols-5">
+      <div className="grid gap-4 lg:grid-cols-5 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100 fill-mode-backwards">
         <Card
           className="relative overflow-hidden lg:col-span-3"
           style={
@@ -220,8 +293,18 @@ export default async function SummonerPage({
               : undefined
           }
         >
-          <CardHeader>
-            <CardDescription className="flex items-center justify-between">
+          {estimatedRank && (
+            <Image
+              src={tierEmblemUrl(estimatedRank.tier)}
+              alt=""
+              width={160}
+              height={160}
+              unoptimized
+              className="pointer-events-none absolute -right-4 top-1/2 size-32 -translate-y-1/2 object-contain opacity-90 drop-shadow-xl sm:size-40"
+            />
+          )}
+          <CardHeader className="relative pr-28 sm:pr-40">
+            <CardDescription className="flex flex-wrap items-center gap-2">
               추정 MMR
               <Badge variant="outline" className="bg-background/60 font-normal">
                 {CONFIDENCE_LABELS[confidence]}
@@ -238,7 +321,7 @@ export default async function SummonerPage({
             )}
           </CardHeader>
           {verdict && (
-            <CardContent>
+            <CardContent className="relative pr-28 sm:pr-40">
               <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-2.5 text-xs backdrop-blur-sm sm:text-sm">
                 {verdict.tone === "up" && (
                   <ArrowUp className="size-4 shrink-0 text-emerald-500" />
@@ -263,15 +346,24 @@ export default async function SummonerPage({
 
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardDescription>현재 티어</CardDescription>
-            <CardTitle
-              className="text-xl sm:text-2xl"
-              style={
-                currentRank ? { color: TIER_COLORS[currentRank.tier] } : undefined
-              }
-            >
-              {currentRank?.label ?? "언랭크"}
-            </CardTitle>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1.5">
+                <CardDescription>현재 티어</CardDescription>
+                <CardTitle
+                  className="text-xl sm:text-2xl"
+                  style={
+                    currentRank
+                      ? { color: TIER_COLORS[currentRank.tier] }
+                      : undefined
+                  }
+                >
+                  {currentRank?.label ?? "언랭크"}
+                </CardTitle>
+              </div>
+              {recentWinrate !== null && matches.length > 0 && (
+                <WinrateRing pct={recentWinrate} games={matches.length} />
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-2.5 text-sm">
             {soloEntry && (
@@ -284,13 +376,6 @@ export default async function SummonerPage({
                 %)
               </div>
             )}
-            {recentWinrate !== null && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Crosshair className="size-4" />
-                최근 {matches.length}경기 승률{" "}
-                {Math.round(recentWinrate * 100)}%
-              </div>
-            )}
             <div className="flex items-center gap-2 text-muted-foreground">
               <Users className="size-4" />
               표본 {sampledPlayers}명의 현재 랭크 분석
@@ -301,7 +386,7 @@ export default async function SummonerPage({
 
       {/* 판독기 스케일 */}
       {(currentPoints !== null || estimatedPoints !== null) && (
-        <Card>
+        <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-200 fill-mode-backwards">
           <CardHeader>
             <CardTitle className="text-base">티어 스펙트럼 판독</CardTitle>
           </CardHeader>
@@ -317,7 +402,7 @@ export default async function SummonerPage({
       )}
 
       {/* 추이 차트 */}
-      <Card>
+      <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300 fill-mode-backwards">
         <CardHeader>
           <CardTitle className="text-base">경기별 MMR 추이</CardTitle>
           <CardDescription>
@@ -336,7 +421,7 @@ export default async function SummonerPage({
       </Card>
 
       {/* 매치 리스트 */}
-      <Card>
+      <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-[400ms] fill-mode-backwards">
         <CardHeader>
           <CardTitle className="text-base">분석에 사용된 경기</CardTitle>
         </CardHeader>

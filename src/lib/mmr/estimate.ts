@@ -12,6 +12,7 @@ import {
   getLeagueEntries,
   getMatch,
   getRankedMatchIds,
+  getSummoner,
 } from "@/lib/riot/client";
 import type { LeagueEntry, MatchInfo, PlatformRegion } from "@/lib/riot/types";
 import { pointsToRank, rankToPoints, type RankLabel } from "./rank";
@@ -49,6 +50,8 @@ export interface MatchSample {
 export interface MmrEstimate {
   account: { gameName: string; tagLine: string };
   latestMatchId: string | null; // 분석 시점의 최신 경기 ID — 재분석 필요 여부 판단용
+  profileIconId?: number | null; // 구버전 저장 결과에는 없을 수 있음
+  summonerLevel?: number | null;
   soloEntry: LeagueEntry | null;
   currentPoints: number | null;
   currentRank: RankLabel | null;
@@ -98,9 +101,10 @@ export async function estimateMmr(
   onProgress?: (done: number, total: number) => void,
 ): Promise<MmrEstimate> {
   const account = await getAccountByRiotId(platform, gameName, tagLine);
-  const [entries, matchIds] = await Promise.all([
+  const [entries, matchIds, summoner] = await Promise.all([
     getLeagueEntries(platform, account.puuid),
     getRankedMatchIds(platform, account.puuid, fetchCountFor(depth)),
+    getSummoner(platform, account.puuid).catch(() => null),
   ]);
 
   const solo = soloQueueEntry(entries);
@@ -202,6 +206,8 @@ export async function estimateMmr(
   return {
     account: { gameName: account.gameName, tagLine: account.tagLine },
     latestMatchId: matchIds[0] ?? null,
+    profileIconId: summoner?.profileIconId ?? null,
+    summonerLevel: summoner?.summonerLevel ?? null,
     soloEntry: solo,
     currentPoints,
     currentRank: currentPoints !== null ? pointsToRank(currentPoints) : null,

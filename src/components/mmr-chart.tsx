@@ -1,9 +1,10 @@
 "use client";
 
 import {
+  Area,
   CartesianGrid,
+  ComposedChart,
   Line,
-  LineChart,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -47,7 +48,13 @@ export function MmrChart({
 
   return (
     <ChartContainer config={chartConfig} className="h-64 w-full">
-      <LineChart data={data} margin={{ left: 8, right: 8, top: 8 }}>
+      <ComposedChart data={data} margin={{ left: 8, right: 8, top: 8 }}>
+        <defs>
+          <linearGradient id="fillLobby" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="var(--color-lobby)" stopOpacity={0.25} />
+            <stop offset="95%" stopColor="var(--color-lobby)" stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
         <XAxis dataKey="game" tickLine={false} axisLine={false} fontSize={11} />
         <YAxis
@@ -85,11 +92,12 @@ export function MmrChart({
             }}
           />
         )}
-        <Line
+        <Area
           dataKey="lobby"
           type="monotone"
           stroke="var(--color-lobby)"
           strokeWidth={2}
+          fill="url(#fillLobby)"
           connectNulls
           dot={({ cx, cy, payload, index }) => (
             <circle
@@ -113,7 +121,7 @@ export function MmrChart({
           dot={false}
         />
         <ChartLegend content={<ChartLegendContent />} />
-      </LineChart>
+      </ComposedChart>
     </ChartContainer>
   );
 }

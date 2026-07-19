@@ -35,7 +35,12 @@ class PostgresStore implements CacheStore {
   constructor(url: string) {
     this.db = (async () => {
       const postgres = (await import("postgres")).default;
-      const sql = postgres(url, { max: 3, prepare: false });
+      const sql = postgres(url, {
+        max: 3,
+        prepare: false,
+        // CREATE TABLE IF NOT EXISTS의 "already exists" NOTICE 로그 억제
+        onnotice: () => {},
+      });
       await sql`
         CREATE TABLE IF NOT EXISTS cache_entries (
           key text PRIMARY KEY,

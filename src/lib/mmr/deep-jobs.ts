@@ -1,15 +1,25 @@
-// 정밀 분석(20경기 × 전원) 백그라운드 잡 관리.
-// 페이지는 빠른 추정을 먼저 보여주고, 클라이언트가 /api/deep을 폴링하면
-// 여기서 잡을 시작해 완료 시 결과를 캐시에 넣는다. 완료 후 페이지 새로고침이
-// 캐시를 읽어 정밀 결과로 갱신된다.
+// 분석 결과 저장/재사용 + 정밀 분석 백그라운드 잡 관리.
+//
+// 저장된 결과(quick/deep)는 TTL이 아니라 "새 경기가 생겼는지"로 무효화한다:
+// 검색 시 최신 매치 ID 하나만 비교해서 같으면 이전 분석을 그대로 재사용하고,
+// 다르면(새 게임을 돌렸으면) 다시 분석한다. TTL은 안전망(24시간)으로만 둔다.
 //
 // 주의: 잡 상태가 서버 메모리에 있으므로 long-running 서버(npm start, Railway 등)
 // 전제다. 서버리스(Vercel)에서는 응답 후 실행이 동결돼 동작하지 않는다.
 
 import "server-only";
 import { cache } from "@/lib/cache";
+import { getAccountByRiotId, getRankedMatchIds } from "@/lib/riot/client";
 import type { PlatformRegion } from "@/lib/riot/types";
-import { DEEP_DEPTH, estimateMmr, type MmrEstimate } from "./estimate";
+import {
+  DEEP_DEPTH,
+  QUICK_DEPTH,
+  estimateMmr,
+  fetchCountFor,
+  type MmrEstimate,
+} from "./estimate";
+
+const RESULT_TTL = 60 * 60 * 24; // 안전망 TTL — 신선도 판단은 latestMatchId 비교가 우선
 
 export interface DeepJob {
   state: "running" | "done" | "error";
@@ -21,20 +31,86 @@ const globalForJobs = globalThis as unknown as {
 };
 const jobs = globalForJobs.__deepJobs ?? (globalForJobs.__deepJobs = new Map());
 
+function resultKey(
+  kind: "quick" | "deep",
+  platform: string,
+  gameName: string,
+  tagLine: string,
+): string {
+  return `${kind}:${platform}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
+}
+
 export function deepCacheKey(
   platform: string,
   gameName: string,
   tagLine: string,
 ): string {
-  return `deep:${platform}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
+  return resultKey("deep", platform, gameName, tagLine);
 }
 
 export function getDeepJob(key: string): DeepJob | null {
   return jobs.get(key) ?? null;
 }
 
-export function getDeepResult(key: string): Promise<MmrEstimate | null> {
-  return cache.get<MmrEstimate>(key);
+/** 현재 최신 매치 ID (account/matchids 캐시를 타므로 저렴) */
+export async function getLatestMatchId(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<string | null> {
+  const account = await getAccountByRiotId(platform, gameName, tagLine);
+  const ids = await getRankedMatchIds(
+    platform,
+    account.puuid,
+    fetchCountFor(QUICK_DEPTH),
+  );
+  return ids[0] ?? null;
+}
+
+/** 저장된 결과가 있고 그 이후 새 경기가 없으면 반환, 아니면 null */
+async function getFreshResult(
+  kind: "quick" | "deep",
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  latestMatchId: string | null,
+): Promise<MmrEstimate | null> {
+  const stored = await cache.get<MmrEstimate>(
+    resultKey(kind, platform, gameName, tagLine),
+  );
+  if (!stored || stored.latestMatchId !== latestMatchId) return null;
+  return stored;
+}
+
+export function getFreshDeepResult(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  latestMatchId: string | null,
+): Promise<MmrEstimate | null> {
+  return getFreshResult("deep", platform, gameName, tagLine, latestMatchId);
+}
+
+export function getFreshQuickResult(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  latestMatchId: string | null,
+): Promise<MmrEstimate | null> {
+  return getFreshResult("quick", platform, gameName, tagLine, latestMatchId);
+}
+
+export async function saveQuickResult(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  result: MmrEstimate,
+): Promise<void> {
+  await cache.set(
+    resultKey("quick", platform, gameName, tagLine),
+    result,
+    RESULT_TTL,
+  );
 }
 
 /** 이미 실행 중이면 무시하고, 아니면 정밀 분석을 백그라운드로 시작 */
@@ -53,7 +129,7 @@ export function startDeepJob(
     job.progress = total ? done / total : 0;
   })
     .then(async (result) => {
-      await cache.set(key, result, 60 * 30);
+      await cache.set(key, result, RESULT_TTL);
       job.state = "done";
     })
     .catch(() => {

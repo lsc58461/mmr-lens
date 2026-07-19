@@ -30,6 +30,11 @@ export const QUICK_DEPTH: AnalysisDepth = { matches: 8, samplesPerTeam: 3 };
 // 정밀 분석: 20경기 × 본인 제외 전원(내 팀 4 + 상대 팀 5)
 export const DEEP_DEPTH: AnalysisDepth = { matches: 20, samplesPerTeam: 5 };
 
+/** 리메이크 제외분을 감안해 여유 있게 조회할 매치 ID 수 */
+export function fetchCountFor(depth: AnalysisDepth): number {
+  return Math.min(depth.matches + Math.ceil(depth.matches / 4), 100);
+}
+
 export interface MatchSample {
   matchId: string;
   gameCreation: number;
@@ -43,6 +48,7 @@ export interface MatchSample {
 
 export interface MmrEstimate {
   account: { gameName: string; tagLine: string };
+  latestMatchId: string | null; // 분석 시점의 최신 경기 ID — 재분석 필요 여부 판단용
   soloEntry: LeagueEntry | null;
   currentPoints: number | null;
   currentRank: RankLabel | null;
@@ -91,12 +97,10 @@ export async function estimateMmr(
   depth: AnalysisDepth = QUICK_DEPTH,
   onProgress?: (done: number, total: number) => void,
 ): Promise<MmrEstimate> {
-  // 리메이크 제외분을 감안해 여유 있게 조회
-  const fetchCount = Math.min(depth.matches + Math.ceil(depth.matches / 4), 100);
   const account = await getAccountByRiotId(platform, gameName, tagLine);
   const [entries, matchIds] = await Promise.all([
     getLeagueEntries(platform, account.puuid),
-    getRankedMatchIds(platform, account.puuid, fetchCount),
+    getRankedMatchIds(platform, account.puuid, fetchCountFor(depth)),
   ]);
 
   const solo = soloQueueEntry(entries);
@@ -197,6 +201,7 @@ export async function estimateMmr(
 
   return {
     account: { gameName: account.gameName, tagLine: account.tagLine },
+    latestMatchId: matchIds[0] ?? null,
     soloEntry: solo,
     currentPoints,
     currentRank: currentPoints !== null ? pointsToRank(currentPoints) : null,

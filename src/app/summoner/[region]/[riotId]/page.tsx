@@ -22,7 +22,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { championIconUrl, getDDragonVersion } from "@/lib/ddragon";
-import { deepCacheKey, getDeepResult } from "@/lib/mmr/deep-jobs";
+import {
+  getFreshDeepResult,
+  getFreshQuickResult,
+  getLatestMatchId,
+  saveQuickResult,
+} from "@/lib/mmr/deep-jobs";
 import { estimateMmr } from "@/lib/mmr/estimate";
 import { TIER_COLORS } from "@/lib/mmr/rank";
 import { recordSearch } from "@/lib/recent";
@@ -99,16 +104,23 @@ export default async function SummonerPage({
   const gameName = decoded.slice(0, hashIndex);
   const tagLine = decoded.slice(hashIndex + 1);
 
-  // 정밀 분석 결과가 캐시에 있으면 그것을, 없으면 빠른 추정을 사용
+  // 최신 매치 ID가 그대로면 저장된 분석(정밀 우선)을 재사용하고,
+  // 새 경기가 생겼을 때만 다시 분석한다.
+  const platform = region as PlatformRegion;
   let result;
   let mode: "quick" | "deep" = "quick";
   try {
-    const deep = await getDeepResult(deepCacheKey(region, gameName, tagLine));
+    const latestMatchId = await getLatestMatchId(platform, gameName, tagLine);
+    const deep = await getFreshDeepResult(platform, gameName, tagLine, latestMatchId);
     if (deep) {
       result = deep;
       mode = "deep";
     } else {
-      result = await estimateMmr(region as PlatformRegion, gameName, tagLine);
+      result = await getFreshQuickResult(platform, gameName, tagLine, latestMatchId);
+      if (!result) {
+        result = await estimateMmr(platform, gameName, tagLine);
+        await saveQuickResult(platform, gameName, tagLine, result);
+      }
     }
   } catch (e) {
     if (e instanceof RiotApiError && e.status === 404) {
@@ -133,7 +145,7 @@ export default async function SummonerPage({
   const ddVersion = await getDDragonVersion();
 
   await recordSearch({
-    region: region as PlatformRegion,
+    region: platform,
     gameName: result.account.gameName,
     tagLine: result.account.tagLine,
     currentLabel: result.currentRank?.label ?? null,

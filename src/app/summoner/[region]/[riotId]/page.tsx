@@ -300,13 +300,13 @@ export default async function SummonerPage({
             <Image
               src={tierEmblemUrl(estimatedRank.tier)}
               alt=""
-              width={224}
-              height={224}
+              width={192}
+              height={192}
               unoptimized
-              className="pointer-events-none absolute -right-2 top-1/2 size-40 -translate-y-1/2 scale-110 object-contain opacity-95 drop-shadow-xl sm:size-56"
+              className="pointer-events-none absolute -right-3 -top-1 size-32 scale-110 object-contain opacity-95 drop-shadow-xl sm:size-44"
             />
           )}
-          <CardHeader className="relative pr-36 sm:pr-52">
+          <CardHeader className="relative pr-24 sm:pr-40">
             <CardDescription className="flex flex-wrap items-center gap-2">
               추정 MMR
               <Badge variant="outline" className="bg-background/60 font-normal">
@@ -324,7 +324,7 @@ export default async function SummonerPage({
             )}
           </CardHeader>
           {verdict && (
-            <CardContent className="relative pr-36 sm:pr-52">
+            <CardContent className="relative z-10">
               <div className="flex items-center gap-2 rounded-lg border bg-background/60 px-3 py-2.5 text-xs backdrop-blur-sm sm:text-sm">
                 {verdict.tone === "up" && (
                   <ArrowUp className="size-4 shrink-0 text-emerald-500" />

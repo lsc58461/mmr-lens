@@ -26,7 +26,7 @@ export function MmrScale({
   }
 
   return (
-    <div className="pt-8 pb-7">
+    <div className="pt-8 pb-8">
       <div className="relative">
         {/* 추정 마커 (위) */}
         {estimatedPoints !== null && (
@@ -49,43 +49,34 @@ export function MmrScale({
           </div>
         )}
 
-        {/* 티어 스펙트럼 바 */}
-        <div className="relative">
-          <div className="flex h-3.5 w-full gap-px overflow-hidden rounded-full">
-            {segments.map((s) => (
-              <div
-                key={s.start}
-                className="h-full flex-1 opacity-85"
-                style={{ backgroundColor: TIER_COLORS[s.tier] }}
-              />
-            ))}
-          </div>
-          {/* 마커 세로선 — 바를 관통해 정확한 위치를 보여준다 */}
-          {estimatedPoints !== null && (
-            <div
-              className="absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 rounded-full bg-chart-2 shadow-[0_0_0_1.5px_var(--background)]"
-              style={{ left: `${pos(estimatedPoints)}%` }}
-            />
-          )}
-          {currentPoints !== null && (
-            <div
-              className="absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_0_1.5px_var(--background)]"
-              style={{ left: `${pos(currentPoints)}%` }}
-            />
-          )}
-        </div>
-
-        {/* 세그먼트 라벨 */}
-        <div className="mt-1.5 flex w-full gap-px">
+        {/* 티어 스펙트럼 바 — 티어 이름은 바 안에 표시 */}
+        <div className="flex h-6 w-full gap-px overflow-hidden rounded-full">
           {segments.map((s) => (
             <div
               key={s.start}
-              className="flex-1 truncate text-center text-[10px] text-muted-foreground"
+              className="flex h-full flex-1 items-center justify-center opacity-90"
+              style={{ backgroundColor: TIER_COLORS[s.tier] }}
             >
-              {TIER_LABELS[s.tier]}
+              <span className="truncate px-1 text-[10px] font-semibold text-black/60">
+                {TIER_LABELS[s.tier]}
+              </span>
             </div>
           ))}
         </div>
+
+        {/* 마커 세로선 — 바를 관통해 정확한 위치를 보여준다 */}
+        {estimatedPoints !== null && (
+          <div
+            className="absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 rounded-full bg-chart-2 shadow-[0_0_0_1.5px_var(--background)]"
+            style={{ left: `${pos(estimatedPoints)}%` }}
+          />
+        )}
+        {currentPoints !== null && (
+          <div
+            className="absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_0_1.5px_var(--background)]"
+            style={{ left: `${pos(currentPoints)}%` }}
+          />
+        )}
       </div>
     </div>
   );

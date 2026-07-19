@@ -45,7 +45,7 @@ export default function RootLayout({
           </div>
 
           <header className="sticky top-0 z-40 border-b border-border/60 bg-background/75 backdrop-blur-md">
-            <div className="mx-auto flex h-14 w-full max-w-4xl items-center justify-between px-4">
+            <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
               <Link href="/" className="group flex items-center gap-2">
                 <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-sm transition-transform group-hover:rotate-45">
                   <Aperture className="size-4.5" />
@@ -66,7 +66,7 @@ export default function RootLayout({
               </div>
             </div>
           </header>
-          <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
             {children}
           </main>
           <footer className="border-t py-4 text-center text-xs text-muted-foreground">

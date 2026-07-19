@@ -320,14 +320,15 @@ export default async function SummonerPage({
                 )}
               </div>
               {estimatedRank && (
-                <Image
-                  src={tierEmblemUrl(estimatedRank.tier)}
-                  alt=""
-                  width={208}
-                  height={208}
-                  unoptimized
-                  className="-my-6 -mr-3 size-28 shrink-0 object-contain drop-shadow-xl sm:size-36"
-                />
+                <div className="relative -my-6 -mr-3 size-28 shrink-0 sm:size-36">
+                  <Image
+                    src={tierEmblemUrl(estimatedRank.tier)}
+                    alt=""
+                    fill
+                    unoptimized
+                    className="object-contain drop-shadow-xl"
+                  />
+                </div>
               )}
             </div>
           </CardHeader>

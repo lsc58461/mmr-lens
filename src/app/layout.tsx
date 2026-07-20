@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Aperture, History } from "lucide-react";
+import { History } from "lucide-react";
 import Link from "next/link";
 import "./globals.css";
+import { LogoMark } from "@/components/logo-mark";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Toaster } from "@/components/ui/sonner";
@@ -41,15 +42,13 @@ export default function RootLayout({
             aria-hidden
             className="pointer-events-none fixed inset-x-0 top-0 -z-10 h-105 overflow-hidden"
           >
-            <div className="absolute left-1/2 top-[-14rem] size-[36rem] -translate-x-1/2 rounded-full bg-primary/12 blur-3xl dark:bg-primary/10" />
+            <div className="absolute left-1/2 -top-56 size-144 -translate-x-1/2 rounded-full bg-primary/12 blur-3xl dark:bg-primary/10" />
           </div>
 
           <header className="sticky top-0 z-40 border-b border-border/60 bg-background/75 backdrop-blur-md">
             <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
               <Link href="/" className="group flex items-center gap-2">
-                <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/60 text-primary-foreground shadow-sm transition-transform group-hover:rotate-45">
-                  <Aperture className="size-4.5" />
-                </span>
+                <LogoMark className="size-7 shadow-sm transition-transform group-hover:scale-110" />
                 <span className="font-semibold tracking-tight">
                   MMR <span className="text-primary">Lens</span>
                 </span>

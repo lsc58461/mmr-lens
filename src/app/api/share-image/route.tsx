@@ -112,12 +112,14 @@ export async function GET(req: NextRequest) {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {/* LogoMark(파비콘)와 동일한 마크 — 비율: 링 r15/64, 포인트 (44,20) r4.5/64 */}
             <div
               style={{
+                position: "relative",
                 display: "flex",
                 width: 44,
                 height: 44,
-                borderRadius: 12,
+                borderRadius: 10,
                 background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
                 alignItems: "center",
                 justifyContent: "center",
@@ -126,10 +128,22 @@ export async function GET(req: NextRequest) {
               <div
                 style={{
                   display: "flex",
-                  width: 20,
-                  height: 20,
+                  width: 21,
+                  height: 21,
                   borderRadius: 999,
-                  border: "4px solid #ffffff",
+                  border: "3px solid #ffffff",
+                }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  right: 10,
+                  display: "flex",
+                  width: 6,
+                  height: 6,
+                  borderRadius: 999,
+                  backgroundColor: "#fbbf24",
                 }}
               />
             </div>

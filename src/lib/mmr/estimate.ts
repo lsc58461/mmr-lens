@@ -97,6 +97,54 @@ function trimmedMean(values: number[]): number | null {
   return trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
 }
 
+/**
+ * 분석 창 선택: 풀 전체에서 듀오(같은 팀 반복 등장)를 감지하고,
+ * 최신 경기부터 비듀오 경기가 목표 수에 도달할 때까지의 구간을 반환한다.
+ * (구간 안의 듀오 경기는 플래그와 함께 포함돼 표시용으로 쓰인다)
+ */
+function selectAnalysisWindow(
+  pool: MatchInfo[],
+  selfPuuid: string,
+  targetNonDuo: number,
+): { window: MatchInfo[]; duoFlags: boolean[] } {
+  const teammateCounts = new Map<string, number>();
+  for (const m of pool) {
+    const self = m.participants.find((p) => p.puuid === selfPuuid);
+    if (!self) continue;
+    for (const p of m.participants) {
+      if (p.puuid !== selfPuuid && p.teamId === self.teamId) {
+        teammateCounts.set(p.puuid, (teammateCounts.get(p.puuid) ?? 0) + 1);
+      }
+    }
+  }
+  const duoPuuids = new Set(
+    [...teammateCounts]
+      .filter(([, count]) => count >= DUO_APPEARANCE_THRESHOLD)
+      .map(([puuid]) => puuid),
+  );
+  const isDuo = (m: MatchInfo): boolean => {
+    const self = m.participants.find((p) => p.puuid === selfPuuid);
+    if (!self) return false;
+    return m.participants.some(
+      (p) =>
+        p.puuid !== selfPuuid &&
+        p.teamId === self.teamId &&
+        duoPuuids.has(p.puuid),
+    );
+  };
+
+  const window: MatchInfo[] = [];
+  const duoFlags: boolean[] = [];
+  let nonDuo = 0;
+  for (const m of pool) {
+    const duo = isDuo(m);
+    window.push(m);
+    duoFlags.push(duo);
+    if (!duo && ++nonDuo >= targetNonDuo) break;
+  }
+  return { window, duoFlags };
+}
+
 export async function estimateMmr(
   platform: PlatformRegion,
   gameName: string,
@@ -119,40 +167,37 @@ export async function estimateMmr(
   const allMatches = await Promise.all(
     matchIds.map((id) => getMatch(platform, id)),
   );
-  const matches = allMatches
-    .filter((m) => m.gameDuration >= MIN_GAME_DURATION)
-    .slice(0, depth.matches);
+  let pool = allMatches.filter((m) => m.gameDuration >= MIN_GAME_DURATION);
 
-  // 듀오 감지: 최근 경기들에서 같은 팀에 반복 등장하는 플레이어는 듀오로 간주.
   // 듀오 경기는 로비가 파트너 MMR에 영향을 받아 추정을 오염시키므로 분석에서 뺀다.
-  const teammateCounts = new Map<string, number>();
-  for (const m of matches) {
-    const self = m.participants.find((p) => p.puuid === account.puuid);
-    if (!self) continue;
-    for (const p of m.participants) {
-      if (p.puuid !== account.puuid && p.teamId === self.teamId) {
-        teammateCounts.set(p.puuid, (teammateCounts.get(p.puuid) ?? 0) + 1);
-      }
+  // 비듀오 경기가 목표 수에 못 미치면 풀을 2배로 늘려(백필) 더 과거 경기로 채운다.
+  let { window: matches, duoFlags } = selectAnalysisWindow(
+    pool,
+    account.puuid,
+    depth.matches,
+  );
+  const nonDuoCount = () => duoFlags.filter((d) => !d).length;
+  if (nonDuoCount() < depth.matches) {
+    const maxPool = Math.min(fetchCountFor(depth) * 2, 100);
+    const moreIds = await getRankedMatchIds(platform, account.puuid, maxPool);
+    if (moreIds.length > matchIds.length) {
+      const extra = await Promise.all(
+        moreIds.slice(matchIds.length).map((id) => getMatch(platform, id)),
+      );
+      pool = [
+        ...pool,
+        ...extra.filter((m) => m.gameDuration >= MIN_GAME_DURATION),
+      ];
+      ({ window: matches, duoFlags } = selectAnalysisWindow(
+        pool,
+        account.puuid,
+        depth.matches,
+      ));
     }
   }
-  const duoPuuids = new Set(
-    [...teammateCounts]
-      .filter(([, count]) => count >= DUO_APPEARANCE_THRESHOLD)
-      .map(([puuid]) => puuid),
-  );
-  const isDuoMatch = (m: MatchInfo): boolean => {
-    const self = m.participants.find((p) => p.puuid === account.puuid);
-    if (!self) return false;
-    return m.participants.some(
-      (p) =>
-        p.puuid !== account.puuid &&
-        p.teamId === self.teamId &&
-        duoPuuids.has(p.puuid),
-    );
-  };
-  // 제외 후 남는 표본이 너무 적으면(상시 듀오 유저) 제외를 포기한다
-  let duoFlags = matches.map(isDuoMatch);
-  if (matches.length - duoFlags.filter(Boolean).length < MIN_MATCHES_AFTER_DUO_FILTER) {
+  // 백필 후에도 비듀오 표본이 너무 적으면(상시 듀오 유저) 제외를 포기한다
+  if (nonDuoCount() < MIN_MATCHES_AFTER_DUO_FILTER) {
+    matches = pool.slice(0, depth.matches);
     duoFlags = matches.map(() => false);
   }
 

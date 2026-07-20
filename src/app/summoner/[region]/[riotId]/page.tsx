@@ -46,6 +46,8 @@ import {
 } from "@/lib/riot/types";
 
 export const dynamic = "force-dynamic";
+// 콜드 검색 시 빠른 추정이 레이트리밋 대기까지 수십 초 걸릴 수 있다 (Vercel 함수 제한 대비)
+export const maxDuration = 120;
 
 export async function generateMetadata({
   params,

@@ -13,6 +13,7 @@ import { TIER_COLORS } from "@/lib/mmr/rank";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 function gapText(gap: number | null): string {
   if (gap === null) return "";

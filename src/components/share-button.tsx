@@ -36,12 +36,13 @@ export function ShareButton({
 
   async function share() {
     const imageUrl = `/api/share-image?region=${region}&riotId=${encodeURIComponent(riotId)}`;
+    // 안내 문구가 포함된 공유 전용 페이지 (길게 눌러 저장 가이드)
+    const sharePageUrl = `/share/${region}/${encodeURIComponent(riotId)}`;
 
-    // 인앱 브라우저: fetch 없이 클릭 즉시 이미지 URL을 연다
+    // 인앱 브라우저: fetch 없이 클릭 즉시 안내 페이지를 연다
     // (동기 호출이라 팝업 차단·user activation 문제도 없음)
     if (isInAppBrowser()) {
-      if (!window.open(imageUrl, "_blank")) location.href = imageUrl;
-      toast.info("이미지를 길게 눌러 저장하거나 공유하세요");
+      if (!window.open(sharePageUrl, "_blank")) location.href = sharePageUrl;
       return;
     }
 
@@ -78,12 +79,11 @@ export function ShareButton({
         return;
       }
 
-      // 3) iOS — blob 다운로드가 안 되므로 이미지 URL을 새 탭에서 열기
-      if (!window.open(imageUrl, "_blank")) {
+      // 3) iOS — blob 다운로드가 안 되므로 안내 페이지를 새 탭에서 열기
+      if (!window.open(sharePageUrl, "_blank")) {
         // 팝업 차단 시 현재 탭에서 열기 (뒤로가기로 복귀 가능)
-        location.href = imageUrl;
+        location.href = sharePageUrl;
       }
-      toast.info("이미지를 길게 눌러 저장하거나 공유하세요");
     } catch {
       toast.error("이미지 생성에 실패했어요. 잠시 후 다시 시도해 주세요.");
     } finally {

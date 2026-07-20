@@ -56,13 +56,15 @@ export async function generateMetadata({
 }) {
   const { region, riotId } = await params;
   const decoded = decodeURIComponent(riotId);
-  const title = `${decoded} 숨겨진 MMR — MMR Lens`;
+  const title = `${decoded} 숨겨진 MMR`;
+  const description = `${decoded}의 숨겨진 MMR — 최근 솔로랭크 경기 로비 랭크 역추적 기반 추정치를 확인해 보세요.`;
   const image = `/api/share-image?region=${region}&riotId=${encodeURIComponent(decoded)}`;
   return {
     title,
+    description,
     openGraph: {
       title,
-      description: "최근 경기 로비 랭크 역추적으로 추정한 숨겨진 MMR",
+      description,
       images: [{ url: image, width: 1200, height: 630 }],
     },
     twitter: { card: "summary_large_image", images: [image] },

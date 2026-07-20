@@ -18,10 +18,37 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const DESCRIPTION =
+  "라이엇 공식 API 데이터로 리그 오브 레전드 솔로랭크의 숨겨진 MMR을 추정합니다. 최근 경기 로비의 랭크를 역추적해 내 진짜 실력 점수를 확인해 보세요.";
+
 export const metadata: Metadata = {
-  title: "MMR Lens — 숨겨진 MMR 판독기",
-  description:
-    "라이엇 공식 API 데이터로 롤 솔로랭크의 숨겨진 MMR을 추정해 보여주는 사이트",
+  metadataBase: new URL("https://mmr-lens.kro.kr"),
+  title: {
+    default: "MMR Lens — 숨겨진 MMR 판독기",
+    template: "%s | MMR Lens",
+  },
+  description: DESCRIPTION,
+  keywords: [
+    "롤 MMR",
+    "MMR 측정",
+    "숨겨진 MMR",
+    "롤 MMR 확인",
+    "리그오브레전드 MMR",
+    "솔로랭크 MMR",
+    "MMR 조회",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "ko_KR",
+    siteName: "MMR Lens",
+    title: "MMR Lens — 숨겨진 MMR 판독기",
+    description: DESCRIPTION,
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

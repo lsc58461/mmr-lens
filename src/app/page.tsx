@@ -23,9 +23,31 @@ const FEATURES = [
   },
 ] as const;
 
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "MMR Lens",
+  url: "https://mmr-lens.kro.kr",
+  description:
+    "리그 오브 레전드 솔로랭크의 숨겨진 MMR을 최근 경기 데이터로 추정하는 사이트",
+  potentialAction: {
+    "@type": "SearchAction",
+    target: {
+      "@type": "EntryPoint",
+      urlTemplate:
+        "https://mmr-lens.kro.kr/summoner/kr/{search_term_string}",
+    },
+    "query-input": "required name=search_term_string",
+  },
+};
+
 export default function Home() {
   return (
     <div className="flex flex-col items-center gap-14 py-10 sm:py-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       <div className="max-w-2xl space-y-5 text-center animate-in fade-in slide-in-from-bottom-3 duration-700">
         <Badge
           variant="outline"
@@ -36,7 +58,7 @@ export default function Home() {
         </Badge>
         <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-5xl lg:text-6xl">
           내 진짜{" "}
-          <span className="bg-gradient-to-r from-primary via-primary to-chart-2 bg-clip-text text-transparent">
+          <span className="bg-linear-to-r from-primary via-primary to-chart-2 bg-clip-text text-transparent">
             MMR
           </span>
           은

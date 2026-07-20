@@ -8,7 +8,10 @@ import { PLATFORM_LABELS } from "@/lib/riot/types";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "최근 검색 — MMR Lens" };
+export const metadata = {
+  title: "최근 검색",
+  description: "MMR Lens에서 최근 조회된 소환사들의 티어와 추정 MMR 목록",
+};
 
 function timeAgo(ts: number): string {
   const mins = Math.floor((Date.now() - ts) / 60_000);

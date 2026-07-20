@@ -4,6 +4,7 @@ import {
   getFreshDeepResult,
   getFreshQuickResult,
   getLatestMatchId,
+  isQuickRunActive,
   runQuickAnalysis,
 } from "@/lib/mmr/deep-jobs";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
@@ -33,10 +34,12 @@ export async function POST(req: NextRequest) {
         null;
     if (fresh) return NextResponse.json({ fresh: true });
 
-    // 진행 중이면 runQuickAnalysis 내부의 in-flight 공유가 중복 실행을 막는다
-    after(() =>
-      runQuickAnalysis(platform, gameName, tagLine).catch(() => {}),
-    );
+    // 다른 인스턴스에서 이미 재분석 중이면 중복 트리거하지 않는다
+    if (!(await isQuickRunActive(platform, gameName, tagLine))) {
+      after(() =>
+        runQuickAnalysis(platform, gameName, tagLine).catch(() => {}),
+      );
+    }
     return NextResponse.json({ fresh: false });
   } catch {
     return NextResponse.json({ fresh: false, error: true }, { status: 502 });

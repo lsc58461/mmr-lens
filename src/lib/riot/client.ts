@@ -31,7 +31,8 @@ async function riotFetch<T>(url: string): Promise<T> {
   const apiKey = process.env.RIOT_API_KEY;
   if (!apiKey) throw new Error("RIOT_API_KEY가 설정되지 않았습니다 (.env.local)");
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // 429는 다른 인스턴스와의 합산 한도 초과일 수 있어 더 끈질기게 재시도한다
+  for (let attempt = 0; attempt < 6; attempt++) {
     await riotLimiter.acquire(currentPriority());
     let res: Response;
     try {
@@ -47,8 +48,8 @@ async function riotFetch<T>(url: string): Promise<T> {
     }
     if (res.ok) return res.json() as Promise<T>;
     if (res.status === 429) {
-      const retryAfter = Number(res.headers.get("Retry-After") ?? "2");
-      await sleep(retryAfter * 1000 + 200);
+      const retryAfter = Number(res.headers.get("Retry-After") ?? "5");
+      await sleep(retryAfter * 1000 + 500);
       continue;
     }
     if (res.status >= 500) {

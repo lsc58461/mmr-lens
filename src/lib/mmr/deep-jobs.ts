@@ -120,6 +120,31 @@ export function getStoredResult(
   return cache.get<MmrEstimate>(resultKey(kind, platform, gameName, tagLine));
 }
 
+// 빠른 분석 실행 마커 — Vercel처럼 인스턴스가 여러 개일 때 같은 소환사의
+// 재분석이 인스턴스마다 중복 실행되는 것을 막는다 (90초 무갱신이면 죽은 것으로 간주)
+const QUICK_MARKER_TTL = 60 * 3;
+const QUICK_MARKER_STALE_MS = 90_000;
+
+function quickMarkerKey(
+  platform: string,
+  gameName: string,
+  tagLine: string,
+): string {
+  return `quickjob:${platform}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
+}
+
+/** 다른 인스턴스에서 빠른 분석이 진행 중인지 (트리거 중복 방지용) */
+export async function isQuickRunActive(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<boolean> {
+  const marker = await cache.get<{ at: number }>(
+    quickMarkerKey(platform, gameName, tagLine),
+  );
+  return marker !== null && Date.now() - marker.at < QUICK_MARKER_STALE_MS;
+}
+
 /**
  * 빠른 추정 실행 + 저장. 동일 소환사에 대한 동시 요청은 진행 중인
  * 분석 Promise를 공유해 API 호출이 중복되지 않는다 (thundering herd 방지).
@@ -133,10 +158,29 @@ export function runQuickAnalysis(
   const existing = quickInflight.get(key);
   if (existing) return existing;
 
+  const mk = quickMarkerKey(platform, gameName, tagLine);
   const promise = (async () => {
-    const result = await estimateMmr(platform, gameName, tagLine, QUICK_DEPTH);
-    await cache.set(key, result, RESULT_TTL);
-    return result;
+    await cache.set(mk, { at: Date.now() }, QUICK_MARKER_TTL);
+    let lastMarker = Date.now();
+    try {
+      const result = await estimateMmr(
+        platform,
+        gameName,
+        tagLine,
+        QUICK_DEPTH,
+        () => {
+          // 진행 중 생존신호 (레이트리밋 대기로 오래 걸릴 때 마커 만료 방지)
+          if (Date.now() - lastMarker > 15_000) {
+            lastMarker = Date.now();
+            void cache.set(mk, { at: lastMarker }, QUICK_MARKER_TTL);
+          }
+        },
+      );
+      await cache.set(key, result, RESULT_TTL);
+      return result;
+    } finally {
+      await cache.set(mk, null, 1).catch(() => {});
+    }
   })().finally(() => quickInflight.delete(key));
 
   quickInflight.set(key, promise);

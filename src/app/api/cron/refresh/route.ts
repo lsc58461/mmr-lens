@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { after } from "next/server";
 import {
   ensureQueuedAndSchedule,
   getFreshDeepResult,
@@ -13,10 +12,11 @@ import { getRecentSearches } from "@/lib/recent";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-// 새벽(트래픽 없는 시간) 크론이 호출 — 기록된 소환사 중 스테일한 결과를
-// 미리 재분석해 두어 낮 시간 방문자가 항상 신선한 결과를 즉시 보게 한다.
+// 새벽(트래픽 없는 시간) 크론 — 기록된 소환사 중 스테일한 결과를
+// 실제 검색 흐름과 동일하게(빠른 추정 → 이어서 정밀 분석) 미리 갱신한다.
 // vercel.json crons: 18:00/19:00 UTC = 새벽 3시/4시 KST
 const TIME_BUDGET_MS = 240_000; // maxDuration(300s)에서 여유를 둔 작업 예산
+const DEEP_START_DEADLINE_MS = 45_000; // 이 시점 이후엔 정밀을 새로 시작하지 않음(시간 초과 방지)
 const MAX_REFRESH = 10;
 
 export async function GET(req: NextRequest) {
@@ -33,63 +33,61 @@ export async function GET(req: NextRequest) {
   );
 
   const started = Date.now();
+  const elapsed = () => Date.now() - started;
   const recent = await getRecentSearches(); // 최근 검색 순
 
-  // mode=deep: 가장 최근 검색된 "정밀 스테일" 소환사 1명의 정밀 분석을 실행
-  // (정밀 1건 ≈ 4분이라 크론 1회 예산 전체를 사용 — 4시 크론이 담당)
-  if (req.nextUrl.searchParams.get("mode") === "deep") {
-    for (const r of recent) {
-      try {
-        const latest = await getLatestMatchId(r.region, r.gameName, r.tagLine);
-        if (await getFreshDeepResult(r.region, r.gameName, r.tagLine, latest)) {
-          continue;
-        }
-        const sched = await ensureQueuedAndSchedule(
-          r.region,
-          r.gameName,
-          r.tagLine,
-          (p, g, t) => after(() => runDeepAnalysis(p, g, t)),
-        );
-        return NextResponse.json({
-          deepTarget: `${r.gameName}#${r.tagLine}`,
-          started: sched.selfStarted,
-          tookMs: Date.now() - started,
-        });
-      } catch {
-        continue;
-      }
-    }
-    return NextResponse.json({ deepTarget: null, tookMs: Date.now() - started });
-  }
-  const refreshed: string[] = [];
+  const quickRefreshed: string[] = [];
+  let deepCompleted = 0;
+  let deepBlocked = false; // 러너 락이 다른 분석에 잡혀 있으면 이번 실행에선 정밀 생략
   let skipped = 0;
   let failed = 0;
 
   for (const r of recent) {
-    if (Date.now() - started > TIME_BUDGET_MS || refreshed.length >= limit) {
-      break;
-    }
+    if (elapsed() > TIME_BUDGET_MS || quickRefreshed.length >= limit) break;
     const name = `${r.gameName}#${r.tagLine}`;
     try {
       const latest = await getLatestMatchId(r.region, r.gameName, r.tagLine);
-      const fresh =
-        (await getFreshDeepResult(r.region, r.gameName, r.tagLine, latest)) ??
-        (await getFreshQuickResult(r.region, r.gameName, r.tagLine, latest));
-      if (fresh) {
+      if (await getFreshDeepResult(r.region, r.gameName, r.tagLine, latest)) {
         skipped++;
         continue;
       }
-      await runQuickAnalysis(r.region, r.gameName, r.tagLine);
-      refreshed.push(name);
+
+      // 1) 실제 흐름처럼 빠른 추정 먼저
+      const quickFresh = await getFreshQuickResult(
+        r.region,
+        r.gameName,
+        r.tagLine,
+        latest,
+      );
+      if (!quickFresh) {
+        await runQuickAnalysis(r.region, r.gameName, r.tagLine);
+        quickRefreshed.push(name);
+      }
+
+      // 2) 이어서 정밀 분석 — 완료까지 기다린 뒤 다음 소환사로 (러너 락 존중)
+      if (!deepBlocked && elapsed() < DEEP_START_DEADLINE_MS) {
+        let deepRun: Promise<void> | null = null;
+        await ensureQueuedAndSchedule(r.region, r.gameName, r.tagLine, (p, g, t) => {
+          deepRun = runDeepAnalysis(p, g, t);
+        });
+        if (deepRun) {
+          await deepRun;
+          deepCompleted++;
+        } else {
+          deepBlocked = true;
+        }
+      }
     } catch {
       failed++;
     }
   }
 
   return NextResponse.json({
-    refreshed,
+    quickRefreshed,
+    deepCompleted,
+    deepBlocked,
     skipped,
     failed,
-    tookMs: Date.now() - started,
+    tookMs: elapsed(),
   });
 }

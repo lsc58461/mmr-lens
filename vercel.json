@@ -1,6 +1,6 @@
 {
   "crons": [
     { "path": "/api/cron/refresh", "schedule": "0 18 * * *" },
-    { "path": "/api/cron/refresh?mode=deep", "schedule": "0 19 * * *" }
+    { "path": "/api/cron/refresh", "schedule": "0 19 * * *" }
   ]
 }

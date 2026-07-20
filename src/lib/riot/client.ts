@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "crypto";
 import { riotLimiter } from "./limiter";
-import { cached } from "@/lib/cache";
+import { cache, cached } from "@/lib/cache";
 import {
   PLATFORM_TO_ROUTING,
   RiotApiError,
@@ -99,18 +99,22 @@ export function getSummoner(
   );
 }
 
-/** 최근 솔로랭크 매치 ID 목록 */
-export function getRankedMatchIds(
+/** 최근 솔로랭크 매치 ID 목록. bypassCache면 강제로 새로 조회 후 캐시를 갱신한다 */
+export async function getRankedMatchIds(
   platform: PlatformRegion,
   puuid: string,
   count: number,
+  bypassCache = false,
 ): Promise<string[]> {
   const routing = PLATFORM_TO_ROUTING[platform];
-  return cached(`${keyFp()}:matchids:${routing}:${puuid}:${count}`, 60 * 10, () =>
-    riotFetch<string[]>(
-      `https://${routing}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&type=ranked&start=0&count=${count}`,
-    ),
-  );
+  const key = `${keyFp()}:matchids:${routing}:${puuid}:${count}`;
+  const url = `https://${routing}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&type=ranked&start=0&count=${count}`;
+  if (bypassCache) {
+    const ids = await riotFetch<string[]>(url);
+    await cache.set(key, ids, 60 * 10);
+    return ids;
+  }
+  return cached(key, 60 * 10, () => riotFetch<string[]>(url));
 }
 
 /** 매치 상세. 종료된 매치는 불변이므로 사실상 무기한 캐시한다 */

@@ -12,6 +12,7 @@ import { DeepRefine } from "@/components/deep-refine";
 import { LobbyDistribution } from "@/components/lobby-distribution";
 import { MatchList, type MatchRow } from "@/components/match-list";
 import { MmrChart, type MmrChartPoint } from "@/components/mmr-chart";
+import { ReanalyzeButton } from "@/components/reanalyze-button";
 import { SearchForm } from "@/components/search-form";
 import { ShareButton } from "@/components/share-button";
 import { Badge } from "@/components/ui/badge";
@@ -340,6 +341,11 @@ export default async function SummonerPage({
               mode={mode}
             />
             <ShareButton region={region} riotId={decoded} />
+            <ReanalyzeButton
+              region={region}
+              gameName={gameName}
+              tagLine={tagLine}
+            />
           </div>
         </div>
         <div className="w-full sm:w-80">

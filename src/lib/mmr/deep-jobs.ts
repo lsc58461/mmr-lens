@@ -56,12 +56,14 @@ export async function getLatestMatchId(
   platform: PlatformRegion,
   gameName: string,
   tagLine: string,
+  bypassCache = false,
 ): Promise<string | null> {
   const account = await getAccountByRiotId(platform, gameName, tagLine);
   const ids = await getRankedMatchIds(
     platform,
     account.puuid,
     fetchCountFor(QUICK_DEPTH),
+    bypassCache,
   );
   return ids[0] ?? null;
 }

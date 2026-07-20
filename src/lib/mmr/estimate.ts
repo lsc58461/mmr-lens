@@ -159,7 +159,8 @@ export async function estimateMmr(
 ): Promise<MmrEstimate> {
   const account = await getAccountByRiotId(platform, gameName, tagLine);
   const [entries, matchIds, summoner] = await Promise.all([
-    getLeagueEntries(platform, account.puuid),
+    // 본인 랭크는 캐시 우회 — 표시되는 "현재 티어"는 항상 최신이어야 한다
+    getLeagueEntries(platform, account.puuid, true),
     getRankedMatchIds(platform, account.puuid, fetchCountFor(depth)),
     getSummoner(platform, account.puuid).catch(() => null),
   ]);

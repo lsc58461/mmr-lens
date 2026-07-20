@@ -76,16 +76,27 @@ export function getAccountByRiotId(
   );
 }
 
-/** 현재 랭크(솔로랭크/자유랭크) 조회. 언랭이면 빈 배열 */
-export function getLeagueEntries(
+/**
+ * 현재 랭크(솔로랭크/자유랭크) 조회. 언랭이면 빈 배열.
+ * 참가자 표본용으로는 6시간 캐시를 쓴다 — 로비 평균에 들어갈 뿐이라
+ * 몇 시간 묵은 랭크여도 오차가 미미하고, 전체 API 콜의 대부분을 차지하는
+ * 이 호출의 재사용률이 크게 오른다. 검색 대상 본인 랭크는 bypassCache로
+ * 항상 최신을 받아 표시 정확도를 유지한다.
+ */
+export async function getLeagueEntries(
   platform: PlatformRegion,
   puuid: string,
+  bypassCache = false,
 ): Promise<LeagueEntry[]> {
-  return cached(`${keyFp()}:league:${platform}:${puuid}`, 60 * 30, () =>
-    riotFetch<LeagueEntry[]>(
-      `https://${platform}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`,
-    ),
-  );
+  const key = `${keyFp()}:league:${platform}:${puuid}`;
+  const url = `https://${platform}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`;
+  const TTL = 60 * 60 * 6;
+  if (bypassCache) {
+    const entries = await riotFetch<LeagueEntry[]>(url);
+    await cache.set(key, entries, TTL);
+    return entries;
+  }
+  return cached(key, TTL, () => riotFetch<LeagueEntry[]>(url));
 }
 
 /** 소환사 프로필(아이콘/레벨) 조회 */

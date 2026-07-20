@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { History } from "lucide-react";
+import { CircleHelp, History } from "lucide-react";
 import Link from "next/link";
 import "./globals.css";
 import { LogoMark } from "@/components/logo-mark";
@@ -87,6 +87,13 @@ export default function RootLayout({
                 >
                   <History className="size-4" />
                   최근 검색
+                </Link>
+                <Link
+                  href="/faq"
+                  className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <CircleHelp className="size-4" />
+                  FAQ
                 </Link>
                 <ThemeToggle />
               </div>

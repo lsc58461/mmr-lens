@@ -92,7 +92,11 @@ export function DeepRefine({
       <Badge variant="outline" className="gap-1.5 font-normal text-muted-foreground">
         <Loader2 className="size-3 animate-spin" />
         {state === "queued"
-          ? `정밀 분석 대기 중 · 앞에 ${ahead}개 · 화면을 나가면 대기가 취소돼요`
+          ? `정밀 분석 대기 중 · 앞에 ${ahead}개 · ${
+              ahead <= 5
+                ? "화면을 나가도 순서가 유지돼요"
+                : "화면을 나가면 대기가 취소돼요"
+            }`
           : `정밀 분석 중 ${Math.round(progress * 100)}% · 화면을 나가도 계속 진행돼요`}
       </Badge>
       {reanalyze}

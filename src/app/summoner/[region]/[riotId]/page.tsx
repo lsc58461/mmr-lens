@@ -300,8 +300,10 @@ export default async function SummonerPage({
   const duoExcludedCount = result.duoExcludedCount ?? 0; // 구버전 저장 결과 호환
   const analyzedCount = matches.length - duoExcludedCount;
 
+  // 분석에서 제외된 경기(듀오 추정)는 그래프에서도 뺀다
   const chartData: MmrChartPoint[] = [...matches]
     .reverse()
+    .filter((m) => !(m.suspectedDuo ?? false))
     .map((m, i, arr) => ({
       game: i === arr.length - 1 ? "최근" : `${arr.length - 1 - i}경기 전`,
       lobby: m.lobbyPoints !== null ? Math.round(m.lobbyPoints) : null,
@@ -500,9 +502,9 @@ export default async function SummonerPage({
         <CardHeader>
           <CardTitle className="text-base">경기별 MMR 추이</CardTitle>
           <CardDescription>
-            최근 {matches.length}경기(리메이크 제외) 기준
+            분석에 사용된 최근 {analyzedCount}경기 기준
             {duoExcludedCount > 0 &&
-              ` · 듀오 추정 ${duoExcludedCount}경기는 분석에서 제외`}
+              ` · 듀오 추정 ${duoExcludedCount}경기는 제외됨`}
           </CardDescription>
         </CardHeader>
         <CardContent>

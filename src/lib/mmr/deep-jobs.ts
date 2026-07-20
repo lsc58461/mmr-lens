@@ -202,8 +202,11 @@ export function getDeepJob(
 const RUNNER_LOCK_KEY = "deep-runner-lock";
 const QUEUE_KEY = "deep-queue:list";
 // 대기 건은 클라이언트 폴링(4초 간격)이 계속 갱신한다 — 1분간 갱신이 없으면
-// 브라우저를 닫고 떠난 것으로 보고 소멸시켜 뒷순번이 막히지 않게 한다
+// 브라우저를 닫고 떠난 것으로 보고 소멸시켜 뒷순번이 막히지 않게 한다.
+// 단 상위 5명은 곧 차례가 오므로 화면을 나가도 유지한다(절대 상한 30분).
 const QUEUE_ENTRY_TTL_MS = 60_000;
+const QUEUE_TOP_KEEP = 5;
+const QUEUE_ENTRY_MAX_MS = 30 * 60_000;
 
 interface RunnerLock {
   key: string;
@@ -217,52 +220,84 @@ interface QueueEntry {
 
 async function getQueue(): Promise<QueueEntry[]> {
   const q = (await cache.get<QueueEntry[]>(QUEUE_KEY)) ?? [];
-  return q.filter((e) => Date.now() - e.at < QUEUE_ENTRY_TTL_MS);
-}
-
-/** 대기열에 등록(이미 있으면 생존 신호 갱신)하고 앞에 남은 분석 수(실행 중 1건 포함)를 반환 */
-export async function enqueueDeep(
-  platform: PlatformRegion,
-  gameName: string,
-  tagLine: string,
-): Promise<number> {
-  const key = jobKey(platform, gameName, tagLine);
-  const queue = await getQueue();
-  let index = queue.findIndex((e) => e.key === key);
-  if (index === -1) {
-    queue.push({ key, at: Date.now() });
-    index = queue.length - 1;
-  } else {
-    queue[index].at = Date.now(); // 폴링 생존 신호
+  const now = Date.now();
+  const kept: QueueEntry[] = [];
+  for (const e of q) {
+    const age = now - e.at;
+    if (
+      age < QUEUE_ENTRY_TTL_MS ||
+      (kept.length < QUEUE_TOP_KEEP && age < QUEUE_ENTRY_MAX_MS)
+    ) {
+      kept.push(e);
+    }
   }
-  await cache.set(QUEUE_KEY, queue, 60 * 15);
-  return index + 1; // 실행 중인 1건 + 내 앞의 대기 건들
+  return kept;
 }
 
-async function removeFromQueue(key: string): Promise<void> {
-  const queue = (await getQueue()).filter((e) => e.key !== key);
-  await cache.set(QUEUE_KEY, queue, 60 * 15);
+// "deepjob:kr:이름#태그" → 분석 파라미터 (스케줄러가 헤드의 잡을 대신 시작할 때 사용)
+function parseJobKey(
+  key: string,
+): { platform: PlatformRegion; gameName: string; tagLine: string } | null {
+  const m = key.match(/^deepjob:([^:]+):(.+)$/);
+  if (!m) return null;
+  const hash = m[2].lastIndexOf("#");
+  if (hash <= 0) return null;
+  return {
+    platform: m[1] as PlatformRegion,
+    gameName: m[2].slice(0, hash),
+    tagLine: m[2].slice(hash + 1),
+  };
 }
 
 /**
- * 락 획득 시도. 대기열이 있으면 맨 앞 순번만 획득할 수 있다(선착순 보장).
- * 이미 자신이 보유 중이거나 비어 있으면(또는 죽은 락이면) 획득.
+ * 대기열 등록/생존신호 갱신 + 스케줄링.
+ * 락이 비어 있으면 (요청자가 누구든) 대기열 맨 앞의 잡을 시작한다 —
+ * 브라우저가 없는 상위 대기 건도 다른 사람의 폴링으로 진행된다.
+ * 반환: 요청자 본인 잡이 시작됐는지와 남은 앞 순번 수.
  */
-export async function tryAcquireDeepRunner(
+export async function ensureQueuedAndSchedule(
   platform: PlatformRegion,
   gameName: string,
   tagLine: string,
-): Promise<boolean> {
-  const key = jobKey(platform, gameName, tagLine);
-  const holder = await cache.get<RunnerLock>(RUNNER_LOCK_KEY);
-  if (holder && holder.key !== key && Date.now() - holder.at < JOB_STALE_MS) {
-    return false;
+  startJob: (p: PlatformRegion, g: string, t: string) => void,
+): Promise<{ selfStarted: boolean; ahead: number }> {
+  const selfKey = jobKey(platform, gameName, tagLine);
+  const now = Date.now();
+  let queue = await getQueue();
+
+  let index = queue.findIndex((e) => e.key === selfKey);
+  if (index === -1) {
+    queue.push({ key: selfKey, at: now });
+    index = queue.length - 1;
+  } else {
+    queue[index].at = now; // 폴링 생존 신호
   }
-  const queue = await getQueue();
-  if (queue.length > 0 && queue[0].key !== key) return false;
-  await cache.set<RunnerLock>(RUNNER_LOCK_KEY, { key, at: Date.now() }, 60 * 10);
-  await removeFromQueue(key);
-  return true;
+
+  const holder = await cache.get<RunnerLock>(RUNNER_LOCK_KEY);
+  const busy = holder !== null && holder.at !== 0 && now - holder.at < JOB_STALE_MS;
+  if (busy) {
+    await cache.set(QUEUE_KEY, queue, 60 * 15);
+    return { selfStarted: false, ahead: index + 1 };
+  }
+
+  // 락이 비었다 — 헤드의 잡을 시작
+  const head = queue[0];
+  const parsed = parseJobKey(head.key);
+  queue = queue.slice(1);
+  await cache.set(QUEUE_KEY, queue, 60 * 15);
+  if (!parsed) {
+    // 파싱 불가한 항목은 버리고 다음 폴링에서 재시도
+    return { selfStarted: false, ahead: index };
+  }
+  await cache.set<RunnerLock>(
+    RUNNER_LOCK_KEY,
+    { key: head.key, at: now },
+    60 * 10,
+  );
+  await markDeepJobRunning(parsed.platform, parsed.gameName, parsed.tagLine);
+  startJob(parsed.platform, parsed.gameName, parsed.tagLine);
+
+  return { selfStarted: head.key === selfKey, ahead: index };
 }
 
 async function releaseDeepRunner(key: string): Promise<void> {

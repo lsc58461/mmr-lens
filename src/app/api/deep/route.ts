@@ -1,14 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { after } from "next/server";
 import {
-  enqueueDeep,
+  ensureQueuedAndSchedule,
   getDeepJob,
   getFreshDeepResult,
   getLatestMatchId,
   isJobStale,
-  markDeepJobRunning,
   runDeepAnalysis,
-  tryAcquireDeepRunner,
 } from "@/lib/mmr/deep-jobs";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
 
@@ -43,16 +41,21 @@ export async function GET(req: NextRequest) {
       // done인데 신선한 결과가 없으면 새 경기가 생긴 것 — 아래로 내려가 재시작
     }
 
-    // 다른 소환사의 정밀 분석이 진행 중이면 대기열 등록 — 순번이 오면 다음 폴링 때 시작
-    if (!(await tryAcquireDeepRunner(platform, gameName, tagLine))) {
-      const ahead = await enqueueDeep(platform, gameName, tagLine);
-      return NextResponse.json({ state: "queued", progress: 0, ahead });
+    // 대기열 등록 + 스케줄링: 락이 비어 있으면 (내 것이든 아니든) 헤드의 잡을 시작
+    const sched = await ensureQueuedAndSchedule(
+      platform,
+      gameName,
+      tagLine,
+      (p, g, t) => after(() => runDeepAnalysis(p, g, t)),
+    );
+    if (sched.selfStarted) {
+      return NextResponse.json({ state: "running", progress: 0 });
     }
-
-    // 새 잡 시작 — 응답을 먼저 보내고 after()로 백그라운드에서 분석
-    await markDeepJobRunning(platform, gameName, tagLine);
-    after(() => runDeepAnalysis(platform, gameName, tagLine));
-    return NextResponse.json({ state: "running", progress: 0 });
+    return NextResponse.json({
+      state: "queued",
+      progress: 0,
+      ahead: sched.ahead,
+    });
   } catch {
     return NextResponse.json({ state: "error", progress: 0 });
   }

@@ -12,5 +12,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "hourly",
       priority: 0.6,
     },
+    {
+      url: "https://mmr-lens.kro.kr/faq",
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
   ];
 }

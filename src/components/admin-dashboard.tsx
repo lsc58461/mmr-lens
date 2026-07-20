@@ -185,8 +185,8 @@ export function AdminDashboard() {
             기록된 소환사 ({status?.summoners.length ?? 0})
           </CardTitle>
           <CardDescription>
-            최근 검색 기록 전체 · 스테일 = 정밀/빠른 결과의 매치 기준 불일치
-            또는 구버전 알고리즘 (저장 데이터 간 비교, 24시간 지나면 캐시 만료)
+            최근 검색 기록 전체 · 스테일 = 매치 기준 불일치, 구버전 알고리즘
+            또는 분석 후 72시간 경과 (저장 데이터 간 비교 기준)
           </CardDescription>
         </CardHeader>
         <CardContent>

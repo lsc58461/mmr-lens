@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     const id = `${r.region}:${r.gameName.toLowerCase()}#${r.tagLine.toLowerCase()}`;
     const quick = quickMap.get(id);
     const deep = deepMap.get(id);
-    const FRESH_AGE_MS = 24 * 60 * 60_000;
+    const FRESH_AGE_MS = 72 * 60 * 60_000;
     const isCurrent = (m: StoredMeta) =>
       (m.algoVersion ?? 0) === ALGO_VERSION &&
       now - (m.analyzedAt ?? 0) <= FRESH_AGE_MS;

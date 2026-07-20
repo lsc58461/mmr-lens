@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -199,6 +200,14 @@ export default async function SummonerPage({
   const gameName = decoded.slice(0, hashIndex);
   const tagLine = decoded.slice(hashIndex + 1);
 
+  // 크롤러(OG 미리보기 봇·검색엔진)는 분석을 유발하거나 기록을 남기지 않는다.
+  // 저장된 결과가 있으면 그대로 보여주고(SEO 유지), 없으면 안내만 반환.
+  const ua = (await headers()).get("user-agent") ?? "";
+  const isBot =
+    /bot|crawl|spider|scrap|facebookexternalhit|kakaotalk|slack|twitter|discord|telegram|whatsapp|preview|embed/i.test(
+      ua,
+    );
+
   // 최신 매치 ID가 그대로면 저장된 분석(정밀 우선)을 재사용하고,
   // 새 경기가 생겼으면: 이전 분석이 있으면 일단 보여주며 백그라운드 재분석(stale),
   // 아무것도 없으면(첫 검색) 즉시 분석한다.
@@ -230,6 +239,13 @@ export default async function SummonerPage({
         if (stale) {
           result = stale;
           mode = "stale";
+        } else if (isBot) {
+          return (
+            <ErrorCard
+              title="아직 분석된 적 없는 소환사예요"
+              description="사이트에서 검색하면 숨겨진 MMR 분석이 시작됩니다."
+            />
+          );
         } else {
           result = await runQuickAnalysis(platform, gameName, tagLine);
         }
@@ -272,8 +288,10 @@ export default async function SummonerPage({
     }
   }
 
-  await recordSearch({
-    region: platform,
+  // 봇 트래픽은 최근 검색에 기록하지 않는다
+  if (!isBot)
+    await recordSearch({
+      region: platform,
     gameName: result.account.gameName,
     tagLine: result.account.tagLine,
     currentLabel: result.currentRank?.label ?? null,

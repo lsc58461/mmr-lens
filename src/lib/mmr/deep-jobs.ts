@@ -22,7 +22,10 @@ import {
   type MmrEstimate,
 } from "./estimate";
 
-const RESULT_TTL = 60 * 60 * 24; // 안전망 TTL — 신선도 판단은 latestMatchId 비교가 우선
+// 결과는 30일 보관한다 — 만료로 사라지는 대신 "이전 분석"으로 즉시 표시되고
+// 백그라운드 재분석이 갱신한다. 신선도(24h)는 아래 FRESH_MAX_AGE_MS로 판정.
+const RESULT_TTL = 60 * 60 * 24 * 30;
+const FRESH_MAX_AGE_MS = 24 * 60 * 60_000;
 const JOB_TTL = 60 * 15;
 const JOB_STALE_MS = 5 * 60_000; // 이 시간 동안 진행이 없으면 죽은 잡으로 간주
 
@@ -85,7 +88,10 @@ async function getFreshResult(
     !stored ||
     stored.latestMatchId !== latestMatchId ||
     // 구버전 알고리즘으로 계산된 결과는 재분석
-    (stored.algoVersion ?? 0) !== ALGO_VERSION
+    (stored.algoVersion ?? 0) !== ALGO_VERSION ||
+    // 24시간 넘은 결과는 참가자 랭크 변동을 반영하기 위해 재분석
+    // (analyzedAt이 없는 구버전 결과 포함 — stale 표시로는 계속 쓰인다)
+    Date.now() - (stored.analyzedAt ?? 0) > FRESH_MAX_AGE_MS
   ) {
     return null;
   }

@@ -2,12 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
-import {
-  getFreshDeepResult,
-  getFreshQuickResult,
-  getLatestMatchId,
-  runQuickAnalysis,
-} from "@/lib/mmr/deep-jobs";
+import { getStoredResult } from "@/lib/mmr/deep-jobs";
 import type { MmrEstimate } from "@/lib/mmr/estimate";
 import { TIER_COLORS } from "@/lib/mmr/rank";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
@@ -34,16 +29,11 @@ export async function GET(req: NextRequest) {
   const gameName = riotId.slice(0, hashIndex);
   const tagLine = riotId.slice(hashIndex + 1);
 
-  let result: MmrEstimate;
-  try {
-    const latestMatchId = await getLatestMatchId(platform, gameName, tagLine);
-    result =
-      (await getFreshDeepResult(platform, gameName, tagLine, latestMatchId)) ??
-      (await getFreshQuickResult(platform, gameName, tagLine, latestMatchId)) ??
-      (await runQuickAnalysis(platform, gameName, tagLine));
-  } catch {
-    return new Response("not found", { status: 404 });
-  }
+  // 저장된 결과만 사용한다 — 크롤러(OG 미리보기 봇)가 이미지 URL을 긁을 때
+  // 분석이 실행되거나 상태가 생기지 않도록, 여기서는 절대 분석하지 않는다.
+  const result: MmrEstimate | null =
+    (await getStoredResult("deep", platform, gameName, tagLine)) ??
+    (await getStoredResult("quick", platform, gameName, tagLine));
 
   const [bold, regular] = await Promise.all([
     readFile(path.join(process.cwd(), "src/assets/fonts/Pretendard-Bold.ttf")),
@@ -51,6 +41,51 @@ export async function GET(req: NextRequest) {
       path.join(process.cwd(), "src/assets/fonts/Pretendard-Regular.ttf"),
     ),
   ]);
+
+  // 분석 기록이 없는 소환사 — 분석을 유발하지 않고 안내 카드만 반환
+  if (!result) {
+    return new ImageResponse(
+      (
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 24,
+            backgroundColor: "#09090b",
+            color: "#fafafa",
+            fontFamily: "Pretendard",
+          }}
+        >
+          <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>
+            MMR <span style={{ color: "#3b82f6", marginLeft: 8 }}>Lens</span>
+          </div>
+          <div style={{ display: "flex", fontSize: 52, fontWeight: 700 }}>
+            {gameName}
+            <span style={{ color: "#71717b" }}>#{tagLine}</span>
+          </div>
+          <div style={{ display: "flex", fontSize: 28, color: "#a1a1aa" }}>
+            아직 분석되지 않은 소환사예요 — 검색하면 숨겨진 MMR 분석이
+            시작됩니다
+          </div>
+          <div style={{ display: "flex", fontSize: 22, color: "#52525c" }}>
+            mmr-lens.kro.kr
+          </div>
+        </div>
+      ),
+      {
+        width: 1200,
+        height: 630,
+        fonts: [
+          { name: "Pretendard", data: bold, weight: 700 },
+          { name: "Pretendard", data: regular, weight: 400 },
+        ],
+      },
+    );
+  }
 
   let emblemUri: string | null = null;
   if (result.estimatedRank) {

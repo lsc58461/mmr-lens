@@ -56,6 +56,7 @@ export interface MatchSample {
 
 export interface MmrEstimate {
   algoVersion: number;
+  analyzedAt?: number; // 분석 시각 — 신선도 판정(24h)용, 구버전 결과엔 없음
   account: { gameName: string; tagLine: string };
   latestMatchId: string | null; // 분석 시점의 최신 경기 ID — 재분석 필요 여부 판단용
   profileIconId?: number | null; // 구버전 저장 결과에는 없을 수 있음
@@ -316,6 +317,7 @@ export async function estimateMmr(
 
   return {
     algoVersion: ALGO_VERSION,
+    analyzedAt: Date.now(),
     account: { gameName: account.gameName, tagLine: account.tagLine },
     latestMatchId: matchIds[0] ?? null,
     profileIconId: summoner?.profileIconId ?? null,

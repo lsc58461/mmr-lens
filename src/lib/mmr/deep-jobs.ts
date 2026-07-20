@@ -140,6 +140,80 @@ export function getDeepJob(
   return cache.get<DeepJob>(jobKey(platform, gameName, tagLine));
 }
 
+// 전역 러너 락: 정밀 분석은 한 번에 1건만 실행한다.
+// 여러 건이 병렬로 돌면 레이트리밋을 나눠 먹어 전부 느려지고,
+// Vercel에서는 maxDuration(300s) 안에 아무것도 못 끝낼 수 있다.
+// 대기 건은 클라이언트 폴링이 락이 풀린 뒤 자동으로 시작한다(사실상 선착순).
+const RUNNER_LOCK_KEY = "deep-runner-lock";
+const QUEUE_KEY = "deep-queue:list";
+const QUEUE_ENTRY_TTL_MS = 15 * 60_000; // 폴링이 끊긴 대기 건은 자동 소멸
+
+interface RunnerLock {
+  key: string;
+  at: number;
+}
+
+interface QueueEntry {
+  key: string;
+  at: number;
+}
+
+async function getQueue(): Promise<QueueEntry[]> {
+  const q = (await cache.get<QueueEntry[]>(QUEUE_KEY)) ?? [];
+  return q.filter((e) => Date.now() - e.at < QUEUE_ENTRY_TTL_MS);
+}
+
+/** 대기열에 등록(이미 있으면 유지)하고 앞에 남은 분석 수(실행 중 1건 포함)를 반환 */
+export async function enqueueDeep(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<number> {
+  const key = jobKey(platform, gameName, tagLine);
+  const queue = await getQueue();
+  let index = queue.findIndex((e) => e.key === key);
+  if (index === -1) {
+    queue.push({ key, at: Date.now() });
+    index = queue.length - 1;
+  }
+  await cache.set(QUEUE_KEY, queue, 60 * 15);
+  return index + 1; // 실행 중인 1건 + 내 앞의 대기 건들
+}
+
+async function removeFromQueue(key: string): Promise<void> {
+  const queue = (await getQueue()).filter((e) => e.key !== key);
+  await cache.set(QUEUE_KEY, queue, 60 * 15);
+}
+
+/**
+ * 락 획득 시도. 대기열이 있으면 맨 앞 순번만 획득할 수 있다(선착순 보장).
+ * 이미 자신이 보유 중이거나 비어 있으면(또는 죽은 락이면) 획득.
+ */
+export async function tryAcquireDeepRunner(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<boolean> {
+  const key = jobKey(platform, gameName, tagLine);
+  const holder = await cache.get<RunnerLock>(RUNNER_LOCK_KEY);
+  if (holder && holder.key !== key && Date.now() - holder.at < JOB_STALE_MS) {
+    return false;
+  }
+  const queue = await getQueue();
+  if (queue.length > 0 && queue[0].key !== key) return false;
+  await cache.set<RunnerLock>(RUNNER_LOCK_KEY, { key, at: Date.now() }, 60 * 10);
+  await removeFromQueue(key);
+  return true;
+}
+
+async function releaseDeepRunner(key: string): Promise<void> {
+  const holder = await cache.get<RunnerLock>(RUNNER_LOCK_KEY);
+  if (holder?.key === key) {
+    // 삭제 대신 즉시 만료 처리 (스토어에 delete가 없음)
+    await cache.set<RunnerLock>(RUNNER_LOCK_KEY, { key, at: 0 }, 1);
+  }
+}
+
 export function isJobStale(job: DeepJob): boolean {
   return Date.now() - job.updatedAt > JOB_STALE_MS;
 }
@@ -173,13 +247,18 @@ export async function runDeepAnalysis(
       DEEP_DEPTH,
       (done, total) => {
         const p = total ? done / total : 0;
-        // 진행률은 5% 단위로만 기록해 DB 쓰기를 아낀다
+        // 진행률은 5% 단위로만 기록해 DB 쓰기를 아낀다 (러너 락도 함께 갱신)
         if (p - lastWritten >= 0.05) {
           lastWritten = p;
           void cache.set<DeepJob>(
             jk,
             { state: "running", progress: p, updatedAt: Date.now() },
             JOB_TTL,
+          );
+          void cache.set<RunnerLock>(
+            RUNNER_LOCK_KEY,
+            { key: jk, at: Date.now() },
+            60 * 10,
           );
         }
       },
@@ -202,5 +281,7 @@ export async function runDeepAnalysis(
         JOB_TTL,
       )
       .catch(() => {});
+  } finally {
+    await releaseDeepRunner(jk).catch(() => {});
   }
 }

@@ -1,12 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { after } from "next/server";
 import {
+  enqueueDeep,
   getDeepJob,
   getFreshDeepResult,
   getLatestMatchId,
   isJobStale,
   markDeepJobRunning,
   runDeepAnalysis,
+  tryAcquireDeepRunner,
 } from "@/lib/mmr/deep-jobs";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
 
@@ -39,6 +41,12 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ state: "error", progress: 0 });
       }
       // done인데 신선한 결과가 없으면 새 경기가 생긴 것 — 아래로 내려가 재시작
+    }
+
+    // 다른 소환사의 정밀 분석이 진행 중이면 대기열 등록 — 순번이 오면 다음 폴링 때 시작
+    if (!(await tryAcquireDeepRunner(platform, gameName, tagLine))) {
+      const ahead = await enqueueDeep(platform, gameName, tagLine);
+      return NextResponse.json({ state: "queued", progress: 0, ahead });
     }
 
     // 새 잡 시작 — 응답을 먼저 보내고 after()로 백그라운드에서 분석

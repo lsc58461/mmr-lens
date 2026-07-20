@@ -21,7 +21,10 @@ export function DeepRefine({
 }) {
   const router = useRouter();
   const [progress, setProgress] = useState(0);
-  const [state, setState] = useState<"running" | "done" | "error">("running");
+  const [ahead, setAhead] = useState(0);
+  const [state, setState] = useState<"running" | "done" | "error" | "queued">(
+    "running",
+  );
 
   useEffect(() => {
     if (mode !== "quick") return;
@@ -32,11 +35,15 @@ export function DeepRefine({
       try {
         const res = await fetch(`/api/deep?${qs}`);
         if (!res.ok) throw new Error();
-        const data: { state: "running" | "done" | "error"; progress: number } =
-          await res.json();
+        const data: {
+          state: "running" | "done" | "error" | "queued";
+          progress: number;
+          ahead?: number;
+        } = await res.json();
         if (stopped) return;
         setState(data.state);
         setProgress(data.progress ?? 0);
+        setAhead(data.ahead ?? 0);
         if (data.state === "done") {
           router.refresh();
           return;
@@ -56,8 +63,9 @@ export function DeepRefine({
     };
   }, [mode, region, gameName, tagLine, router]);
 
-  // 정밀 분석이 진행 중일 때는 재분석 버튼을 잠근다 (어차피 곧 갱신됨)
-  const deepRunning = mode === "quick" && state === "running";
+  // 정밀 분석이 진행·대기 중일 때는 재분석 버튼을 잠근다 (어차피 곧 갱신됨)
+  const deepRunning =
+    mode === "quick" && (state === "running" || state === "queued");
   const reanalyze = (
     <ReanalyzeButton
       region={region}
@@ -83,7 +91,9 @@ export function DeepRefine({
     <>
       <Badge variant="outline" className="gap-1.5 font-normal text-muted-foreground">
         <Loader2 className="size-3 animate-spin" />
-        정밀 분석 중 {Math.round(progress * 100)}% · 완료되면 자동 갱신
+        {state === "queued"
+          ? `정밀 분석 대기 중 · 앞에 ${ahead}개 분석이 남았어요`
+          : `정밀 분석 중 ${Math.round(progress * 100)}% · 완료되면 자동 갱신`}
       </Badge>
       {reanalyze}
     </>

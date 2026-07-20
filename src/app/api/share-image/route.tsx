@@ -267,6 +267,8 @@ export async function GET(req: NextRequest) {
         { name: "Pretendard", data: bold, weight: 700 },
         { name: "Pretendard", data: regular, weight: 400 },
       ],
+      // 재시도·반복 공유 시 브라우저 캐시로 즉시 응답 (user activation 만료 완화)
+      headers: { "Cache-Control": "public, max-age=300" },
     },
   );
 }

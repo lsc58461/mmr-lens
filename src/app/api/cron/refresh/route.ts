@@ -1,8 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { after } from "next/server";
 import {
+  ensureQueuedAndSchedule,
   getFreshDeepResult,
   getFreshQuickResult,
   getLatestMatchId,
+  runDeepAnalysis,
   runQuickAnalysis,
 } from "@/lib/mmr/deep-jobs";
 import { getRecentSearches } from "@/lib/recent";
@@ -31,6 +34,33 @@ export async function GET(req: NextRequest) {
 
   const started = Date.now();
   const recent = await getRecentSearches(); // 최근 검색 순
+
+  // mode=deep: 가장 최근 검색된 "정밀 스테일" 소환사 1명의 정밀 분석을 실행
+  // (정밀 1건 ≈ 4분이라 크론 1회 예산 전체를 사용 — 4시 크론이 담당)
+  if (req.nextUrl.searchParams.get("mode") === "deep") {
+    for (const r of recent) {
+      try {
+        const latest = await getLatestMatchId(r.region, r.gameName, r.tagLine);
+        if (await getFreshDeepResult(r.region, r.gameName, r.tagLine, latest)) {
+          continue;
+        }
+        const sched = await ensureQueuedAndSchedule(
+          r.region,
+          r.gameName,
+          r.tagLine,
+          (p, g, t) => after(() => runDeepAnalysis(p, g, t)),
+        );
+        return NextResponse.json({
+          deepTarget: `${r.gameName}#${r.tagLine}`,
+          started: sched.selfStarted,
+          tookMs: Date.now() - started,
+        });
+      } catch {
+        continue;
+      }
+    }
+    return NextResponse.json({ deepTarget: null, tookMs: Date.now() - started });
+  }
   const refreshed: string[] = [];
   let skipped = 0;
   let failed = 0;

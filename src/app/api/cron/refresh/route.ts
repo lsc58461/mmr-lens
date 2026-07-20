@@ -107,7 +107,13 @@ export async function GET(req: NextRequest) {
   const workRemaining = brokeEarly || deepPending;
   const chained = didWork && workRemaining && inChainWindow();
   if (chained) {
-    const url = new URL("/api/cron/refresh", req.nextUrl.origin);
+    // 주의: req origin은 해시 붙은 배포 URL이라 Vercel 인증 보호에 막힌다 —
+    // 반드시 공개 도메인으로 재호출해야 체인이 이어진다 (로컬 테스트만 예외)
+    const origin =
+      req.nextUrl.hostname === "localhost"
+        ? req.nextUrl.origin
+        : "https://mmr-lens.kro.kr";
+    const url = new URL("/api/cron/refresh", origin);
     const secret = process.env.CRON_SECRET;
     after(() =>
       fetch(url, {

@@ -1,9 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cache } from "@/lib/cache";
 import {
+  getDeepJob,
   getFreshDeepResult,
   getFreshQuickResult,
   getLatestMatchId,
+  isJobStale,
 } from "@/lib/mmr/deep-jobs";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
 
@@ -25,6 +27,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid params" }, { status: 400 });
   }
   const platform = region as PlatformRegion;
+
+  // 정밀 분석이 진행 중이면 쿨다운을 태우지 않고 차단 — 어차피 곧 최신 결과가 나온다
+  const job = await getDeepJob(platform, gameName, tagLine);
+  if (job?.state === "running" && !isJobStale(job)) {
+    return NextResponse.json({ changed: false, cooldown: 0, deepRunning: true });
+  }
 
   const cdKey = `reanalyze-cd:${platform}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
   const startedAt = await cache.get<number>(cdKey);

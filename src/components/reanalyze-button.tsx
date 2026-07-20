@@ -13,10 +13,12 @@ export function ReanalyzeButton({
   region,
   gameName,
   tagLine,
+  disabled = false, // 정밀 분석 진행 중일 때 비활성화
 }: {
   region: string;
   gameName: string;
   tagLine: string;
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -37,9 +39,15 @@ export function ReanalyzeButton({
       const qs = new URLSearchParams({ region, gameName, tagLine }).toString();
       const res = await fetch(`/api/reanalyze?${qs}`, { method: "POST" });
       if (!res.ok) throw new Error();
-      const data: { changed: boolean; cooldown: number } = await res.json();
+      const data: {
+        changed: boolean;
+        cooldown: number;
+        deepRunning?: boolean;
+      } = await res.json();
       setRemaining(data.cooldown);
-      if (data.changed) {
+      if (data.deepRunning) {
+        toast.info("정밀 분석이 진행 중이에요 — 끝나면 자동으로 반영됩니다.");
+      } else if (data.changed) {
         toast.success("새 경기를 발견했어요 — 다시 분석합니다");
         router.refresh();
       } else if (data.cooldown < 60) {
@@ -60,7 +68,7 @@ export function ReanalyzeButton({
       variant="outline"
       size="sm"
       onClick={reanalyze}
-      disabled={loading || cooling}
+      disabled={disabled || loading || cooling}
       className="gap-1.5"
     >
       <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />

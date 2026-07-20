@@ -18,8 +18,8 @@ import type { LeagueEntry, MatchInfo, PlatformRegion } from "@/lib/riot/types";
 import { pointsToRank, rankToPoints, type RankLabel } from "./rank";
 
 // 알고리즘이 바뀔 때 올린다 — 저장된 분석 결과의 버전이 다르면 재분석된다
-// v3: 듀오 감지·제외 + 백필
-export const ALGO_VERSION = 3;
+// v4: 듀오 금지 구간(한국 마스터+, 전서버 그마+)은 듀오 감지 비활성화
+export const ALGO_VERSION = 4;
 
 const MIN_GAME_DURATION = 300; // 5분 미만은 리메이크로 간주하고 제외
 const OBS_WEIGHT = 0.35; // 로비 평균(매치메이커 관측)을 레이팅에 반영하는 비율
@@ -174,36 +174,51 @@ export async function estimateMmr(
   );
   let pool = allMatches.filter((m) => m.gameDuration >= MIN_GAME_DURATION);
 
-  // 듀오 경기는 로비가 파트너 MMR에 영향을 받아 추정을 오염시키므로 분석에서 뺀다.
-  // 비듀오 경기가 목표 수에 못 미치면 풀을 2배로 늘려(백필) 더 과거 경기로 채운다.
-  let { window: matches, duoFlags } = selectAnalysisWindow(
-    pool,
-    account.puuid,
-    depth.matches,
-  );
-  const nonDuoCount = () => duoFlags.filter((d) => !d).length;
-  if (nonDuoCount() < depth.matches) {
-    const maxPool = Math.min(fetchCountFor(depth) * 2, 100);
-    const moreIds = await getRankedMatchIds(platform, account.puuid, maxPool);
-    if (moreIds.length > matchIds.length) {
-      const extra = await Promise.all(
-        moreIds.slice(matchIds.length).map((id) => getMatch(platform, id)),
-      );
-      pool = [
-        ...pool,
-        ...extra.filter((m) => m.gameDuration >= MIN_GAME_DURATION),
-      ];
-      ({ window: matches, duoFlags } = selectAnalysisWindow(
-        pool,
-        account.puuid,
-        depth.matches,
-      ));
-    }
-  }
-  // 백필 후에도 비듀오 표본이 너무 적으면(상시 듀오 유저) 제외를 포기한다
-  if (nonDuoCount() < MIN_MATCHES_AFTER_DUO_FILTER) {
+  // 듀오 감지 비활성화 구간: 한국 서버는 마스터+, 전 서버 그랜드마스터+가
+  // 듀오 금지라 반복 등장 = 좁은 최상위 풀에서의 자연스러운 재매칭(오탐)이다.
+  const noDuoTiers =
+    platform === "kr"
+      ? ["MASTER", "GRANDMASTER", "CHALLENGER"]
+      : ["GRANDMASTER", "CHALLENGER"];
+  const duoDetectionEnabled = !(solo && noDuoTiers.includes(solo.tier));
+
+  let matches: MatchInfo[];
+  let duoFlags: boolean[];
+  if (!duoDetectionEnabled) {
     matches = pool.slice(0, depth.matches);
     duoFlags = matches.map(() => false);
+  } else {
+    // 듀오 경기는 로비가 파트너 MMR에 영향을 받아 추정을 오염시키므로 분석에서 뺀다.
+    // 비듀오 경기가 목표 수에 못 미치면 풀을 2배로 늘려(백필) 더 과거 경기로 채운다.
+    ({ window: matches, duoFlags } = selectAnalysisWindow(
+      pool,
+      account.puuid,
+      depth.matches,
+    ));
+    const nonDuoCount = () => duoFlags.filter((d) => !d).length;
+    if (nonDuoCount() < depth.matches) {
+      const maxPool = Math.min(fetchCountFor(depth) * 2, 100);
+      const moreIds = await getRankedMatchIds(platform, account.puuid, maxPool);
+      if (moreIds.length > matchIds.length) {
+        const extra = await Promise.all(
+          moreIds.slice(matchIds.length).map((id) => getMatch(platform, id)),
+        );
+        pool = [
+          ...pool,
+          ...extra.filter((m) => m.gameDuration >= MIN_GAME_DURATION),
+        ];
+        ({ window: matches, duoFlags } = selectAnalysisWindow(
+          pool,
+          account.puuid,
+          depth.matches,
+        ));
+      }
+    }
+    // 백필 후에도 비듀오 표본이 너무 적으면(상시 듀오 유저) 제외를 포기한다
+    if (nonDuoCount() < MIN_MATCHES_AFTER_DUO_FILTER) {
+      matches = pool.slice(0, depth.matches);
+      duoFlags = matches.map(() => false);
+    }
   }
 
   // 조회할 참가자 puuid를 매치 전체에서 모아 중복 제거 후 한 번씩만 조회

@@ -13,6 +13,7 @@ import { cache } from "@/lib/cache";
 import { getAccountByRiotId, getRankedMatchIds } from "@/lib/riot/client";
 import type { PlatformRegion } from "@/lib/riot/types";
 import {
+  ALGO_VERSION,
   DEEP_DEPTH,
   QUICK_DEPTH,
   estimateMmr,
@@ -79,7 +80,14 @@ async function getFreshResult(
   const stored = await cache.get<MmrEstimate>(
     resultKey(kind, platform, gameName, tagLine),
   );
-  if (!stored || stored.latestMatchId !== latestMatchId) return null;
+  if (
+    !stored ||
+    stored.latestMatchId !== latestMatchId ||
+    // 구버전 알고리즘으로 계산된 결과는 재분석
+    (stored.algoVersion ?? 0) !== ALGO_VERSION
+  ) {
+    return null;
+  }
   return stored;
 }
 

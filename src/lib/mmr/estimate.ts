@@ -17,6 +17,10 @@ import {
 import type { LeagueEntry, MatchInfo, PlatformRegion } from "@/lib/riot/types";
 import { pointsToRank, rankToPoints, type RankLabel } from "./rank";
 
+// 알고리즘이 바뀔 때 올린다 — 저장된 분석 결과의 버전이 다르면 재분석된다
+// v3: 듀오 감지·제외 + 백필
+export const ALGO_VERSION = 3;
+
 const MIN_GAME_DURATION = 300; // 5분 미만은 리메이크로 간주하고 제외
 const OBS_WEIGHT = 0.35; // 로비 평균(매치메이커 관측)을 레이팅에 반영하는 비율
 const ELO_K = 32; // Elo 승패 업데이트 K-팩터 (디비전 100pt 스케일 기준)
@@ -51,6 +55,7 @@ export interface MatchSample {
 }
 
 export interface MmrEstimate {
+  algoVersion: number;
   account: { gameName: string; tagLine: string };
   latestMatchId: string | null; // 분석 시점의 최신 경기 ID — 재분석 필요 여부 판단용
   profileIconId?: number | null; // 구버전 저장 결과에는 없을 수 있음
@@ -294,6 +299,7 @@ export async function estimateMmr(
     totalSamples >= 30 ? "high" : totalSamples >= 15 ? "medium" : "low";
 
   return {
+    algoVersion: ALGO_VERSION,
     account: { gameName: account.gameName, tagLine: account.tagLine },
     latestMatchId: matchIds[0] ?? null,
     profileIconId: summoner?.profileIconId ?? null,

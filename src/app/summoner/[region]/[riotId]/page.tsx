@@ -80,7 +80,7 @@ function gapVerdict(gap: number): {
 } {
   if (gap >= 150)
     return {
-      text: "티어보다 훨씬 높은 실력대에서 매칭되고 있어요. 승급 가도!",
+      text: "티어보다 훨씬 높은 실력대에서 매칭되고 있어요. 곧 티어가 따라 올라갈 거예요.",
       tone: "up",
     };
   if (gap >= 50)

@@ -28,8 +28,12 @@ export interface DeepJob {
 
 const globalForJobs = globalThis as unknown as {
   __deepJobs?: Map<string, DeepJob>;
+  __quickInflight?: Map<string, Promise<MmrEstimate>>;
 };
 const jobs = globalForJobs.__deepJobs ?? (globalForJobs.__deepJobs = new Map());
+// 같은 소환사를 여러 요청이 동시에 검색해도 분석은 1번만 돌도록 진행 중 Promise를 공유
+const quickInflight =
+  globalForJobs.__quickInflight ?? (globalForJobs.__quickInflight = new Map());
 
 function resultKey(
   kind: "quick" | "deep",
@@ -111,6 +115,29 @@ export async function saveQuickResult(
     result,
     RESULT_TTL,
   );
+}
+
+/**
+ * 빠른 추정 실행 + 저장. 동일 소환사에 대한 동시 요청은 진행 중인
+ * 분석 Promise를 공유해 API 호출이 중복되지 않는다 (thundering herd 방지).
+ */
+export function runQuickAnalysis(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<MmrEstimate> {
+  const key = resultKey("quick", platform, gameName, tagLine);
+  const existing = quickInflight.get(key);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const result = await estimateMmr(platform, gameName, tagLine, QUICK_DEPTH);
+    await saveQuickResult(platform, gameName, tagLine, result);
+    return result;
+  })().finally(() => quickInflight.delete(key));
+
+  quickInflight.set(key, promise);
+  return promise;
 }
 
 /** 이미 실행 중이면 무시하고, 아니면 정밀 분석을 백그라운드로 시작 */

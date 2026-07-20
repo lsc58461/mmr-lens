@@ -6,9 +6,9 @@ import {
   getFreshDeepResult,
   getFreshQuickResult,
   getLatestMatchId,
-  saveQuickResult,
+  runQuickAnalysis,
 } from "@/lib/mmr/deep-jobs";
-import { estimateMmr, type MmrEstimate } from "@/lib/mmr/estimate";
+import type { MmrEstimate } from "@/lib/mmr/estimate";
 import { TIER_COLORS } from "@/lib/mmr/rank";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
 
@@ -39,8 +39,7 @@ export async function GET(req: NextRequest) {
     result =
       (await getFreshDeepResult(platform, gameName, tagLine, latestMatchId)) ??
       (await getFreshQuickResult(platform, gameName, tagLine, latestMatchId)) ??
-      (await estimateMmr(platform, gameName, tagLine));
-    await saveQuickResult(platform, gameName, tagLine, result);
+      (await runQuickAnalysis(platform, gameName, tagLine));
   } catch {
     return new Response("not found", { status: 404 });
   }

@@ -34,9 +34,8 @@ import {
   getFreshDeepResult,
   getFreshQuickResult,
   getLatestMatchId,
-  saveQuickResult,
+  runQuickAnalysis,
 } from "@/lib/mmr/deep-jobs";
-import { estimateMmr } from "@/lib/mmr/estimate";
 import { pointsToRank, TIER_COLORS } from "@/lib/mmr/rank";
 import { recordSearch } from "@/lib/recent";
 import { getAccountByRiotId, getSummoner } from "@/lib/riot/client";
@@ -218,8 +217,7 @@ export default async function SummonerPage({
         latestMatchId,
       );
       if (!result) {
-        result = await estimateMmr(platform, gameName, tagLine);
-        await saveQuickResult(platform, gameName, tagLine, result);
+        result = await runQuickAnalysis(platform, gameName, tagLine);
       }
     }
   } catch (e) {

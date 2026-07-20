@@ -10,6 +10,7 @@
 
 import "server-only";
 import { cache } from "@/lib/cache";
+import { withLowPriority } from "@/lib/riot/limiter";
 import { getAccountByRiotId, getRankedMatchIds } from "@/lib/riot/client";
 import type { PlatformRegion } from "@/lib/riot/types";
 import {
@@ -109,6 +110,16 @@ export function getFreshQuickResult(
   return getFreshResult("quick", platform, gameName, tagLine, latestMatchId);
 }
 
+/** 신선도·버전과 무관하게 저장된 결과를 반환 (stale-while-revalidate 표시용) */
+export function getStoredResult(
+  kind: "quick" | "deep",
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<MmrEstimate | null> {
+  return cache.get<MmrEstimate>(resultKey(kind, platform, gameName, tagLine));
+}
+
 /**
  * 빠른 추정 실행 + 저장. 동일 소환사에 대한 동시 요청은 진행 중인
  * 분석 Promise를 공유해 API 호출이 중복되지 않는다 (thundering herd 방지).
@@ -146,7 +157,9 @@ export function getDeepJob(
 // 대기 건은 클라이언트 폴링이 락이 풀린 뒤 자동으로 시작한다(사실상 선착순).
 const RUNNER_LOCK_KEY = "deep-runner-lock";
 const QUEUE_KEY = "deep-queue:list";
-const QUEUE_ENTRY_TTL_MS = 15 * 60_000; // 폴링이 끊긴 대기 건은 자동 소멸
+// 대기 건은 클라이언트 폴링(4초 간격)이 계속 갱신한다 — 1분간 갱신이 없으면
+// 브라우저를 닫고 떠난 것으로 보고 소멸시켜 뒷순번이 막히지 않게 한다
+const QUEUE_ENTRY_TTL_MS = 60_000;
 
 interface RunnerLock {
   key: string;
@@ -163,7 +176,7 @@ async function getQueue(): Promise<QueueEntry[]> {
   return q.filter((e) => Date.now() - e.at < QUEUE_ENTRY_TTL_MS);
 }
 
-/** 대기열에 등록(이미 있으면 유지)하고 앞에 남은 분석 수(실행 중 1건 포함)를 반환 */
+/** 대기열에 등록(이미 있으면 생존 신호 갱신)하고 앞에 남은 분석 수(실행 중 1건 포함)를 반환 */
 export async function enqueueDeep(
   platform: PlatformRegion,
   gameName: string,
@@ -175,6 +188,8 @@ export async function enqueueDeep(
   if (index === -1) {
     queue.push({ key, at: Date.now() });
     index = queue.length - 1;
+  } else {
+    queue[index].at = Date.now(); // 폴링 생존 신호
   }
   await cache.set(QUEUE_KEY, queue, 60 * 15);
   return index + 1; // 실행 중인 1건 + 내 앞의 대기 건들
@@ -240,7 +255,9 @@ export async function runDeepAnalysis(
   const jk = jobKey(platform, gameName, tagLine);
   let lastWritten = 0;
   try {
-    const result = await estimateMmr(
+    // 백그라운드 작업은 저우선순위 — 페이지 로딩(전경) 호출이 항상 먼저 처리된다
+    const result = await withLowPriority(() =>
+      estimateMmr(
       platform,
       gameName,
       tagLine,
@@ -262,6 +279,7 @@ export async function runDeepAnalysis(
           );
         }
       },
+      ),
     );
     await cache.set(
       resultKey("deep", platform, gameName, tagLine),

@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash } from "crypto";
-import { riotLimiter } from "./limiter";
+import { currentPriority, riotLimiter } from "./limiter";
 import { cache, cached } from "@/lib/cache";
 import {
   PLATFORM_TO_ROUTING,
@@ -32,7 +32,7 @@ async function riotFetch<T>(url: string): Promise<T> {
   if (!apiKey) throw new Error("RIOT_API_KEY가 설정되지 않았습니다 (.env.local)");
 
   for (let attempt = 0; attempt < 3; attempt++) {
-    await riotLimiter.acquire();
+    await riotLimiter.acquire(currentPriority());
     let res: Response;
     try {
       res = await fetch(url, {

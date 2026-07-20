@@ -30,10 +30,12 @@ import {
   profileIconUrl,
   tierEmblemUrl,
 } from "@/lib/ddragon";
+import { StaleRefresh } from "@/components/stale-refresh";
 import {
   getFreshDeepResult,
   getFreshQuickResult,
   getLatestMatchId,
+  getStoredResult,
   runQuickAnalysis,
 } from "@/lib/mmr/deep-jobs";
 import { pointsToRank, TIER_COLORS } from "@/lib/mmr/rank";
@@ -198,10 +200,11 @@ export default async function SummonerPage({
   const tagLine = decoded.slice(hashIndex + 1);
 
   // 최신 매치 ID가 그대로면 저장된 분석(정밀 우선)을 재사용하고,
-  // 새 경기가 생겼을 때만 다시 분석한다.
+  // 새 경기가 생겼으면: 이전 분석이 있으면 일단 보여주며 백그라운드 재분석(stale),
+  // 아무것도 없으면(첫 검색) 즉시 분석한다.
   const platform = region as PlatformRegion;
   let result;
-  let mode: "quick" | "deep" = "quick";
+  let mode: "quick" | "deep" | "stale" = "quick";
   try {
     const latestMatchId = await getLatestMatchId(platform, gameName, tagLine);
     const deep = await getFreshDeepResult(
@@ -221,7 +224,15 @@ export default async function SummonerPage({
         latestMatchId,
       );
       if (!result) {
-        result = await runQuickAnalysis(platform, gameName, tagLine);
+        const stale =
+          (await getStoredResult("deep", platform, gameName, tagLine)) ??
+          (await getStoredResult("quick", platform, gameName, tagLine));
+        if (stale) {
+          result = stale;
+          mode = "stale";
+        } else {
+          result = await runQuickAnalysis(platform, gameName, tagLine);
+        }
       }
     }
   } catch (e) {
@@ -333,12 +344,20 @@ export default async function SummonerPage({
             <Badge variant="secondary">
               {PLATFORM_LABELS[region as PlatformRegion]}
             </Badge>
-            <DeepRefine
-              region={region}
-              gameName={gameName}
-              tagLine={tagLine}
-              mode={mode}
-            />
+            {mode === "stale" ? (
+              <StaleRefresh
+                region={region}
+                gameName={gameName}
+                tagLine={tagLine}
+              />
+            ) : (
+              <DeepRefine
+                region={region}
+                gameName={gameName}
+                tagLine={tagLine}
+                mode={mode}
+              />
+            )}
             <ShareButton region={region} riotId={decoded} />
           </div>
         </div>

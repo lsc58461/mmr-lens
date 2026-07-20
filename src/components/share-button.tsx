@@ -13,6 +13,14 @@ function isIOS(): boolean {
   );
 }
 
+// 카톡·네이버·인스타 등 인앱 브라우저(WebView)는 Web Share도 blob 다운로드도
+// 미지원인 경우가 많다 — 이미지 URL을 직접 열어 길게 눌러 저장하게 한다.
+function isInAppBrowser(): boolean {
+  return /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp/i.test(
+    navigator.userAgent,
+  );
+}
+
 // 결과 카드를 서버(/api/share-image)에서 PNG로 받아 공유한다.
 // 단계적 폴백: 시스템 공유 시트 → 파일 다운로드 → 새 탭에서 열기(iOS/인앱).
 // 주의: fetch를 기다린 뒤에는 user activation이 만료돼 share()가
@@ -27,11 +35,19 @@ export function ShareButton({
   const [loading, setLoading] = useState(false);
 
   async function share() {
+    const imageUrl = `/api/share-image?region=${region}&riotId=${encodeURIComponent(riotId)}`;
+
+    // 인앱 브라우저: fetch 없이 클릭 즉시 이미지 URL을 연다
+    // (동기 호출이라 팝업 차단·user activation 문제도 없음)
+    if (isInAppBrowser()) {
+      if (!window.open(imageUrl, "_blank")) location.href = imageUrl;
+      toast.info("이미지를 길게 눌러 저장하거나 공유하세요");
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/share-image?region=${region}&riotId=${encodeURIComponent(riotId)}`,
-      );
+      const res = await fetch(imageUrl);
       if (!res.ok) throw new Error();
       const blob = await res.blob();
       const file = new File([blob], `${riotId.replace("#", "-")}-mmr.png`, {
@@ -49,12 +65,11 @@ export function ShareButton({
         }
       }
 
-      const url = URL.createObjectURL(blob);
-      // 다운로드 시작 전에 URL이 해제되지 않도록 지연 해제
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-
       // 2) 파일 다운로드 (데스크톱/안드로이드)
       if (!isIOS()) {
+        const url = URL.createObjectURL(blob);
+        // 다운로드 시작 전에 URL이 해제되지 않도록 지연 해제
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
         const a = document.createElement("a");
         a.href = url;
         a.download = file.name;
@@ -63,11 +78,10 @@ export function ShareButton({
         return;
       }
 
-      // 3) iOS·인앱 브라우저 — blob 다운로드가 안 되므로 새 탭에서 열기
-      const win = window.open(url, "_blank");
-      if (!win) {
+      // 3) iOS — blob 다운로드가 안 되므로 이미지 URL을 새 탭에서 열기
+      if (!window.open(imageUrl, "_blank")) {
         // 팝업 차단 시 현재 탭에서 열기 (뒤로가기로 복귀 가능)
-        location.href = url;
+        location.href = imageUrl;
       }
       toast.info("이미지를 길게 눌러 저장하거나 공유하세요");
     } catch {

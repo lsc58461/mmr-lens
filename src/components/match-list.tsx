@@ -16,6 +16,7 @@ export interface MatchRow {
   lobbyLabel: string | null; // "플래티넘 2 · 40LP"
   lobbyTier: string | null;
   sampleSize: number;
+  suspectedDuo: boolean;
 }
 
 const COLLAPSED_COUNT = 5;
@@ -52,13 +53,24 @@ export function MatchList({ rows }: { rows: MatchRow[] }) {
               </span>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{m.champName}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-medium">
+                  {m.champName}
+                </span>
+                {m.suspectedDuo && (
+                  <span className="shrink-0 rounded border px-1 py-px text-[10px] text-muted-foreground">
+                    듀오 추정
+                  </span>
+                )}
+              </div>
               <div className="text-xs text-muted-foreground">
                 {m.kda} · {m.when}
               </div>
             </div>
             <div className="shrink-0 text-right">
-              {m.lobbyLabel ? (
+              {m.suspectedDuo ? (
+                <span className="text-xs text-muted-foreground">분석 제외</span>
+              ) : m.lobbyLabel ? (
                 <>
                   <div
                     className="text-sm font-medium"

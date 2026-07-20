@@ -286,6 +286,8 @@ export default async function SummonerPage({
     sampledPlayers,
     confidence,
   } = result;
+  const duoExcludedCount = result.duoExcludedCount ?? 0; // 구버전 저장 결과 호환
+  const analyzedCount = matches.length - duoExcludedCount;
 
   const chartData: MmrChartPoint[] = [...matches]
     .reverse()
@@ -435,8 +437,8 @@ export default async function SummonerPage({
                   {currentRank?.label ?? "언랭크"}
                 </CardTitle>
               </div>
-              {recentWinrate !== null && matches.length > 0 && (
-                <WinrateRing pct={recentWinrate} games={matches.length} />
+              {recentWinrate !== null && analyzedCount > 0 && (
+                <WinrateRing pct={recentWinrate} games={analyzedCount} />
               )}
             </div>
           </CardHeader>
@@ -480,6 +482,8 @@ export default async function SummonerPage({
           <CardTitle className="text-base">경기별 MMR 추이</CardTitle>
           <CardDescription>
             최근 {matches.length}경기(리메이크 제외) 기준
+            {duoExcludedCount > 0 &&
+              ` · 듀오 추정 ${duoExcludedCount}경기는 분석에서 제외`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -523,6 +527,7 @@ export default async function SummonerPage({
                   lobbyLabel: lobby?.label ?? null,
                   lobbyTier: lobby?.tier ?? null,
                   sampleSize: m.sampleSize,
+                  suspectedDuo: m.suspectedDuo ?? false,
                 };
               })}
             />

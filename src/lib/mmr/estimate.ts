@@ -20,6 +20,8 @@ import { pointsToRank, rankToPoints, type RankLabel } from "./rank";
 const MIN_GAME_DURATION = 300; // 5분 미만은 리메이크로 간주하고 제외
 const OBS_WEIGHT = 0.35; // 로비 평균(매치메이커 관측)을 레이팅에 반영하는 비율
 const ELO_K = 32; // Elo 승패 업데이트 K-팩터 (디비전 100pt 스케일 기준)
+const DUO_APPEARANCE_THRESHOLD = 2; // 같은 팀에 이 횟수 이상 등장하면 듀오로 간주
+const MIN_MATCHES_AFTER_DUO_FILTER = 4; // 듀오 제외 후 이보다 적게 남으면 제외 포기
 
 export interface AnalysisDepth {
   matches: number; // 분석할 경기 수
@@ -45,6 +47,7 @@ export interface MatchSample {
   lobbyPoints: number | null; // 로비 절사평균 MMR 포인트 (표본 없으면 null)
   sampleSize: number;
   ratingAfter: number | null; // 이 경기까지 반영한 추정 레이팅 (그래프용)
+  suspectedDuo: boolean; // 듀오 추정 경기 — 분석에서 제외됨
 }
 
 export interface MmrEstimate {
@@ -62,6 +65,7 @@ export interface MmrEstimate {
   recentWinrate: number | null;
   matches: MatchSample[];
   sampledPlayers: number;
+  duoExcludedCount: number; // 분석에서 제외된 듀오 추정 경기 수
   confidence: "high" | "medium" | "low";
 }
 
@@ -119,9 +123,43 @@ export async function estimateMmr(
     .filter((m) => m.gameDuration >= MIN_GAME_DURATION)
     .slice(0, depth.matches);
 
+  // 듀오 감지: 최근 경기들에서 같은 팀에 반복 등장하는 플레이어는 듀오로 간주.
+  // 듀오 경기는 로비가 파트너 MMR에 영향을 받아 추정을 오염시키므로 분석에서 뺀다.
+  const teammateCounts = new Map<string, number>();
+  for (const m of matches) {
+    const self = m.participants.find((p) => p.puuid === account.puuid);
+    if (!self) continue;
+    for (const p of m.participants) {
+      if (p.puuid !== account.puuid && p.teamId === self.teamId) {
+        teammateCounts.set(p.puuid, (teammateCounts.get(p.puuid) ?? 0) + 1);
+      }
+    }
+  }
+  const duoPuuids = new Set(
+    [...teammateCounts]
+      .filter(([, count]) => count >= DUO_APPEARANCE_THRESHOLD)
+      .map(([puuid]) => puuid),
+  );
+  const isDuoMatch = (m: MatchInfo): boolean => {
+    const self = m.participants.find((p) => p.puuid === account.puuid);
+    if (!self) return false;
+    return m.participants.some(
+      (p) =>
+        p.puuid !== account.puuid &&
+        p.teamId === self.teamId &&
+        duoPuuids.has(p.puuid),
+    );
+  };
+  // 제외 후 남는 표본이 너무 적으면(상시 듀오 유저) 제외를 포기한다
+  let duoFlags = matches.map(isDuoMatch);
+  if (matches.length - duoFlags.filter(Boolean).length < MIN_MATCHES_AFTER_DUO_FILTER) {
+    duoFlags = matches.map(() => false);
+  }
+
   // 조회할 참가자 puuid를 매치 전체에서 모아 중복 제거 후 한 번씩만 조회
-  const sampledByMatch = matches.map((m) =>
-    sampleParticipants(m, account.puuid, depth.samplesPerTeam),
+  // (듀오 제외 경기는 랭크 조회도 생략해 API 호출을 아낀다)
+  const sampledByMatch = matches.map((m, i) =>
+    duoFlags[i] ? [] : sampleParticipants(m, account.puuid, depth.samplesPerTeam),
   );
   const uniquePuuids = [...new Set(sampledByMatch.flat().map((p) => p.puuid))];
 
@@ -160,6 +198,7 @@ export async function estimateMmr(
       lobbyPoints: trimmedMean(sampled),
       sampleSize: sampled.length,
       ratingAfter: null,
+      suspectedDuo: duoFlags[i],
     };
   });
 
@@ -168,6 +207,11 @@ export async function estimateMmr(
   //  - 이어서 Elo 업데이트: 로비가 강할수록 승리 가치가 커진다
   let rating: number | null = null;
   for (const s of [...matchSamples].reverse()) {
+    if (s.suspectedDuo) {
+      // 듀오 추정 경기는 레이팅 업데이트 없이 이전 값을 유지
+      s.ratingAfter = rating !== null ? Math.round(rating) : null;
+      continue;
+    }
     if (s.lobbyPoints !== null) {
       rating =
         rating === null
@@ -195,8 +239,9 @@ export async function estimateMmr(
     errorMargin = Math.round((1.96 * Math.sqrt(variance)) / Math.sqrt(lobbies.length));
   }
 
-  const played = matchSamples.length;
-  const wins = matchSamples.filter((s) => s.win).length;
+  const analyzed = matchSamples.filter((s) => !s.suspectedDuo);
+  const played = analyzed.length;
+  const wins = analyzed.filter((s) => s.win).length;
   const recentWinrate = played ? wins / played : null;
 
   const totalSamples = matchSamples.reduce((a, s) => a + s.sampleSize, 0);
@@ -222,6 +267,7 @@ export async function estimateMmr(
     recentWinrate,
     matches: matchSamples,
     sampledPlayers: pointsByPuuid.size,
+    duoExcludedCount: duoFlags.filter(Boolean).length,
     confidence,
   };
 }

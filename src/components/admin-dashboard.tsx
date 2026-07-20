@@ -27,14 +27,26 @@ interface Status {
     name: string;
     lastSeenAgoSec: number;
   }[];
-  recent: {
+  summoners: {
     region: string;
     name: string;
     currentLabel: string | null;
     estimatedLabel: string | null;
     searchedAt: number;
+    analysis: "deep" | "deep-stale" | "quick" | "quick-stale" | "none";
   }[];
 }
+
+const ANALYSIS_BADGES: Record<
+  Status["summoners"][number]["analysis"],
+  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
+> = {
+  deep: { label: "정밀 · 최신", variant: "default" },
+  "deep-stale": { label: "정밀 · 스테일", variant: "destructive" },
+  quick: { label: "빠른 분석", variant: "secondary" },
+  "quick-stale": { label: "빠른 · 스테일", variant: "destructive" },
+  none: { label: "캐시 만료", variant: "outline" },
+};
 
 function timeAgo(ts: number): string {
   const mins = Math.floor((Date.now() - ts) / 60_000);
@@ -165,30 +177,48 @@ export function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* 최근 검색 */}
+      {/* 기록된 소환사 전체 */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <History className="size-4 text-muted-foreground" />
-            최근 검색
+            기록된 소환사 ({status?.summoners.length ?? 0})
           </CardTitle>
-          <CardDescription>최근 15건</CardDescription>
+          <CardDescription>
+            최근 검색 기록 전체 · 스테일 = 정밀/빠른 결과의 매치 기준 불일치
+            또는 구버전 알고리즘 (저장 데이터 간 비교, 24시간 지나면 캐시 만료)
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="divide-y divide-border/60">
-            {status?.recent.map((r) => (
+            {status?.summoners.map((r) => (
               <div
-                key={`${r.region}:${r.name}:${r.searchedAt}`}
+                key={`${r.region}:${r.name}`}
                 className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
               >
-                <span className="font-medium">{r.name}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <a
+                    href={`/summoner/${r.region}/${encodeURIComponent(r.name)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="truncate font-medium underline-offset-4 hover:underline"
+                  >
+                    {r.name}
+                  </a>
+                  <Badge
+                    variant={ANALYSIS_BADGES[r.analysis].variant}
+                    className="shrink-0 text-[10px]"
+                  >
+                    {ANALYSIS_BADGES[r.analysis].label}
+                  </Badge>
+                </span>
                 <span className="text-xs text-muted-foreground">
                   {r.currentLabel ?? "언랭"} → {r.estimatedLabel ?? "?"} ·{" "}
                   {timeAgo(r.searchedAt)}
                 </span>
               </div>
             ))}
-            {!status?.recent.length && (
+            {!status?.summoners.length && (
               <p className="py-2 text-sm text-muted-foreground">기록 없음</p>
             )}
           </div>

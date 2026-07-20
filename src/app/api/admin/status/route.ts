@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_COOKIE, isValidAdminSession } from "@/lib/admin";
 import { cache } from "@/lib/cache";
+import { ALGO_VERSION } from "@/lib/mmr/estimate";
 import { getRecentSearches } from "@/lib/recent";
 
 export const dynamic = "force-dynamic";
@@ -54,16 +55,54 @@ export async function GET(req: NextRequest) {
       lastSeenAgoSec: Math.round((now - e.at) / 1000),
     }));
 
-  return NextResponse.json({
-    running,
-    waiting,
-    recent: recent.slice(0, 15).map((r) => ({
+  // 기록된 소환사 전체(최근 검색 기준) + 분석 캐시 보유·스테일 상태.
+  // 스테일 판정은 저장 데이터 간 비교(정밀 vs 빠른의 매치 기준, 알고리즘 버전)로,
+  // 라이엇 API 호출 없이 계산한다 — 실제 새 경기 여부까지는 알 수 없음.
+  interface StoredMeta {
+    latestMatchId?: string | null;
+    algoVersion?: number;
+  }
+  const [quickEntries, deepEntries] = await Promise.all([
+    cache.entries<StoredMeta>("quick:"),
+    cache.entries<StoredMeta>("deep:"),
+  ]);
+  const quickMap = new Map(
+    quickEntries.map((e) => [e.key.slice("quick:".length), e.value]),
+  );
+  const deepMap = new Map(
+    deepEntries.map((e) => [e.key.slice("deep:".length), e.value]),
+  );
+
+  const summoners = recent.map((r) => {
+    const id = `${r.region}:${r.gameName.toLowerCase()}#${r.tagLine.toLowerCase()}`;
+    const quick = quickMap.get(id);
+    const deep = deepMap.get(id);
+    let analysis: "deep" | "deep-stale" | "quick" | "quick-stale" | "none";
+    if (deep) {
+      const synced =
+        (deep.algoVersion ?? 0) === ALGO_VERSION &&
+        (!quick || deep.latestMatchId === quick.latestMatchId);
+      analysis = synced ? "deep" : "deep-stale";
+    } else if (quick) {
+      analysis =
+        (quick.algoVersion ?? 0) === ALGO_VERSION ? "quick" : "quick-stale";
+    } else {
+      analysis = "none";
+    }
+    return {
       region: r.region,
       name: `${r.gameName}#${r.tagLine}`,
       currentLabel: r.currentLabel,
       estimatedLabel: r.estimatedLabel,
       searchedAt: r.searchedAt,
-    })),
+      analysis,
+    };
+  });
+
+  return NextResponse.json({
+    running,
+    waiting,
+    summoners,
     serverTime: now,
   });
 }

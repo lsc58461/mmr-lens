@@ -6,6 +6,10 @@ import "server-only";
 interface CacheStore {
   get<T>(key: string): Promise<T | null>;
   set<T>(key: string, value: T, ttlSeconds: number): Promise<void>;
+  /** 프리픽스로 시작하는 살아있는 키 목록 (어드민 조회용) */
+  keys(prefix: string): Promise<string[]>;
+  /** 프리픽스로 시작하는 살아있는 항목들 (어드민 조회용) */
+  entries<T>(prefix: string): Promise<{ key: string; value: T }[]>;
 }
 
 class MemoryStore implements CacheStore {
@@ -24,6 +28,20 @@ class MemoryStore implements CacheStore {
   async set<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
     if (this.map.size > 10_000) this.map.clear();
     this.map.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+  }
+
+  async keys(prefix: string): Promise<string[]> {
+    const now = Date.now();
+    return [...this.map.entries()]
+      .filter(([k, v]) => k.startsWith(prefix) && v.expiresAt > now)
+      .map(([k]) => k);
+  }
+
+  async entries<T>(prefix: string): Promise<{ key: string; value: T }[]> {
+    const now = Date.now();
+    return [...this.map.entries()]
+      .filter(([k, v]) => k.startsWith(prefix) && v.expiresAt > now)
+      .map(([k, v]) => ({ key: k, value: v.value as T }));
   }
 }
 
@@ -66,6 +84,22 @@ class PostgresStore implements CacheStore {
       VALUES (${key}, ${sql.json(value as never)}, now() + ${`${ttlSeconds} seconds`}::interval)
       ON CONFLICT (key) DO UPDATE
       SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at`;
+  }
+
+  async keys(prefix: string): Promise<string[]> {
+    const { sql } = await this.db;
+    const rows = await sql`
+      SELECT key FROM cache_entries
+      WHERE key LIKE ${prefix + "%"} AND expires_at > now()`;
+    return rows.map((r) => r.key as string);
+  }
+
+  async entries<T>(prefix: string): Promise<{ key: string; value: T }[]> {
+    const { sql } = await this.db;
+    const rows = await sql`
+      SELECT key, value FROM cache_entries
+      WHERE key LIKE ${prefix + "%"} AND expires_at > now()`;
+    return rows.map((r) => ({ key: r.key as string, value: r.value as T }));
   }
 }
 

@@ -6,6 +6,7 @@ import "./globals.css";
 import { LogoMark } from "@/components/logo-mark";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ToolsMenu } from "@/components/tools-menu";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -86,15 +87,16 @@ export default function RootLayout({
                   className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <History className="size-4" />
-                  최근 검색
+                  <span className="hidden sm:inline">최근 검색</span>
                 </Link>
                 <Link
                   href="/faq"
                   className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <CircleHelp className="size-4" />
-                  FAQ
+                  <span className="hidden sm:inline">FAQ</span>
                 </Link>
+                <ToolsMenu />
                 <ThemeToggle />
               </div>
             </div>

@@ -1,4 +1,12 @@
-import { Activity, Gauge, Heart, Sparkles, Swords, Users } from "lucide-react";
+import {
+  Activity,
+  ArrowRight,
+  Gauge,
+  Heart,
+  Sparkles,
+  Swords,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { SearchForm } from "@/components/search-form";
 import { Badge } from "@/components/ui/badge";
@@ -132,6 +140,10 @@ export default function Home() {
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {description}
               </p>
+              <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
+                사용해 보기
+                <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+              </span>
             </Link>
           ))}
         </div>

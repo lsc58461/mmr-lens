@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { LogoMark } from "@/components/logo-mark";
+import { SummonerAutocomplete } from "@/components/summoner-autocomplete";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -119,6 +120,25 @@ export function AdminDashboard() {
   // 디스코드 웹훅
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookSaving, setWebhookSaving] = useState(false);
+  const [previewSummoner, setPreviewSummoner] = useState("");
+
+  async function previewWebhook() {
+    setWebhookSaving(true);
+    try {
+      const res = await fetch("/api/admin/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preview: previewSummoner }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("미리보기를 보냈어요 — 디스코드 채널을 확인하세요");
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "발송 실패");
+    } finally {
+      setWebhookSaving(false);
+    }
+  }
 
   // 인증된 소환사
   interface Verified {
@@ -485,7 +505,7 @@ export function AdminDashboard() {
       </Card>
 
       {/* 디스코드 알림 */}
-      <Card>
+      <Card className="overflow-visible">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Bell className="size-4 text-chart-2" />
@@ -515,6 +535,27 @@ export function AdminDashboard() {
             >
               테스트 발송
             </Button>
+          </div>
+          <div className="border-t pt-3">
+            <div className="mb-2 text-xs text-muted-foreground">
+              특정 계정 카드로 실제 알림 모양 미리보기
+            </div>
+            <div className="flex gap-2">
+              <SummonerAutocomplete
+                value={previewSummoner}
+                onChange={setPreviewSummoner}
+                placeholder="게임명#태그"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={webhookSaving || !previewSummoner.includes("#")}
+                onClick={previewWebhook}
+                className="shrink-0"
+              >
+                미리보기
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

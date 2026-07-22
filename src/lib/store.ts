@@ -147,6 +147,31 @@ export async function insertLeagueSnapshot(
             ${sql.json(entries as never)})`;
 }
 
+export interface LeagueSnapRow {
+  solo_tier: string | null;
+  solo_rank: string | null;
+  solo_lp: number | null;
+  solo_wins: number | null;
+  solo_losses: number | null;
+  created_at: string;
+}
+
+/** 특정 소환사의 랭크 스냅샷 히스토리 (오래된 순) — LP 득실 추적용 */
+export async function listLeagueSnapshots(
+  fp: string,
+  platform: PlatformRegion,
+  puuid: string,
+  limit = 200,
+): Promise<LeagueSnapRow[]> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT solo_tier, solo_rank, solo_lp, solo_wins, solo_losses, created_at
+    FROM league_snapshots
+    WHERE fp = ${fp} AND platform = ${platform} AND puuid = ${puuid}
+    ORDER BY created_at ASC LIMIT ${limit}`;
+  return rows as unknown as LeagueSnapRow[];
+}
+
 // ── 분석 결과 ───────────────────────────────────────────
 
 export async function getAnalysis(

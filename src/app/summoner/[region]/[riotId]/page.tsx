@@ -40,8 +40,18 @@ import {
   runQuickAnalysis,
 } from "@/lib/mmr/deep-jobs";
 import { pointsToRank, TIER_COLORS } from "@/lib/mmr/rank";
+import {
+  computeLpInsight,
+  hasLpSignal,
+  lpVerdict,
+  type LpInsight,
+} from "@/lib/mmr/lp-insight";
 import { recordSearch } from "@/lib/recent";
-import { getAccountByRiotId, getSummoner } from "@/lib/riot/client";
+import {
+  getAccountByRiotId,
+  getLeagueHistory,
+  getSummoner,
+} from "@/lib/riot/client";
 import {
   RiotApiError,
   PLATFORM_LABELS,
@@ -289,6 +299,15 @@ export default async function SummonerPage({
     }
   }
 
+  // LP 득실 추적 — 스냅샷 히스토리 기반 (API 호출 없음)
+  let lpInsight: LpInsight | null = null;
+  try {
+    const acct = await getAccountByRiotId(platform, gameName, tagLine);
+    lpInsight = computeLpInsight(await getLeagueHistory(platform, acct.puuid));
+  } catch {
+    // 히스토리 조회 실패는 카드 생략으로 처리
+  }
+
   // 봇 트래픽은 최근 검색에 기록하지 않는다
   if (!isBot)
     await recordSearch({
@@ -500,6 +519,58 @@ export default async function SummonerPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* LP 흐름 — 스냅샷이 쌓여야 표시됨 */}
+      {lpInsight && hasLpSignal(lpInsight) && (
+        <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-backwards">
+          <CardHeader>
+            <CardTitle className="text-base">LP 흐름</CardTitle>
+            <CardDescription>
+              랭크 스냅샷 관측 {lpInsight.observedWins}승{" "}
+              {lpInsight.observedLosses}패 기준 · LP 득실은 내부 MMR을 가장
+              직접 반영하는 신호예요
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border px-4 py-3">
+                <div className="text-xs text-muted-foreground">승리당 평균</div>
+                <div className="mt-1 text-xl font-bold text-emerald-500 tabular-nums">
+                  {lpInsight.avgGain !== null
+                    ? `+${lpInsight.avgGain.toFixed(1)} LP`
+                    : "수집 중"}
+                </div>
+              </div>
+              <div className="rounded-lg border px-4 py-3">
+                <div className="text-xs text-muted-foreground">패배당 평균</div>
+                <div className="mt-1 text-xl font-bold text-red-500 tabular-nums">
+                  {lpInsight.avgLoss !== null
+                    ? `-${lpInsight.avgLoss.toFixed(1)} LP`
+                    : "수집 중"}
+                </div>
+              </div>
+            </div>
+            {(() => {
+              const v = lpVerdict(lpInsight);
+              if (!v) return null;
+              return (
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2.5 text-xs sm:text-sm">
+                  {v.tone === "up" && (
+                    <ArrowUp className="size-4 shrink-0 text-emerald-500" />
+                  )}
+                  {v.tone === "down" && (
+                    <ArrowDown className="size-4 shrink-0 text-red-500" />
+                  )}
+                  {v.tone === "flat" && (
+                    <Minus className="size-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span>{v.text}</span>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 로비 티어 분포 */}
       {matches.some((m) => m.lobbyPoints !== null) && (

@@ -20,6 +20,25 @@ const CHANGELOG: {
   items: { tag: Tag; text: string }[];
 }[] = [
   {
+    date: "2026-07-22",
+    title: "LP 흐름 추적과 내부 구조 개선",
+    items: [
+      {
+        tag: "신규",
+        text: "LP 흐름 카드 — 승리당/패배당 평균 LP로 내부 MMR 신호를 교차 확인 (데이터가 쌓이면 표시)",
+      },
+      { tag: "신규", text: "업데이트 내역·점검 안내 페이지" },
+      {
+        tag: "개선",
+        text: "데이터 구조 전면 개편 — 분석 기록 영구 보관, 랭크 히스토리 축적 시작",
+      },
+      {
+        tag: "수정",
+        text: "전각 문자 태그(ＫR1 등)가 다른 소환사로 취급되던 문제",
+      },
+    ],
+  },
+  {
     date: "2026-07-21",
     title: "편의 기능과 안정성 업데이트",
     items: [
@@ -98,7 +117,7 @@ export default function UpdatesPage() {
       <div className="relative space-y-8 border-l pl-6">
         {CHANGELOG.map((entry) => (
           <section key={entry.date} className="relative">
-            <span className="absolute -left-[1.85rem] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-background" />
+            <span className="absolute left-[-1.85rem] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-background" />
             <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h2 className="font-semibold">{entry.title}</h2>
               <time className="text-xs text-muted-foreground">

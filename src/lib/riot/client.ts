@@ -8,9 +8,11 @@ import {
   getMatchRow,
   insertLeagueSnapshot,
   latestLeagueSnapshot,
+  listLeagueSnapshots,
   saveMatchRow,
   updateSummonerProfile,
   upsertSummonerNames,
+  type LeagueSnapRow,
 } from "@/lib/store";
 import {
   PLATFORM_TO_ROUTING,
@@ -159,6 +161,14 @@ export async function getLeagueEntries(
   );
   await insertLeagueSnapshot(keyFp(), platform, puuid, entries).catch(() => {});
   return entries;
+}
+
+/** 랭크 스냅샷 히스토리 — LP 득실 추적용 (API 호출 없음, DB만 조회) */
+export function getLeagueHistory(
+  platform: PlatformRegion,
+  puuid: string,
+): Promise<LeagueSnapRow[]> {
+  return listLeagueSnapshots(keyFp(), platform, puuid);
 }
 
 /** 최근 솔로랭크 매치 ID 목록 — 짧은 신선도라 KV 캐시 유지 */

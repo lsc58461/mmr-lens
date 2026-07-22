@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Activity, Clock, History, LogOut, RefreshCw } from "lucide-react";
+import { Activity, Clock, History, LogOut, RefreshCw, Wrench } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +62,38 @@ export function AdminDashboard() {
   const router = useRouter();
   const [status, setStatus] = useState<Status | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const [maintenance, setMaintenance] = useState(false);
+  const [toggling, setToggling] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/maintenance")
+      .then((r) => r.json())
+      .then((d: { on: boolean }) => setMaintenance(d.on))
+      .catch(() => {});
+  }, []);
+
+  async function toggleMaintenance() {
+    setToggling(true);
+    try {
+      const res = await fetch("/api/maintenance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ on: !maintenance }),
+      });
+      if (!res.ok) throw new Error();
+      const data: { on: boolean } = await res.json();
+      setMaintenance(data.on);
+      toast.success(
+        data.on
+          ? "점검 모드를 켰어요 — 최대 10초 내 전체 적용됩니다"
+          : "점검 모드를 껐어요",
+      );
+    } catch {
+      toast.error("점검 모드 변경에 실패했어요");
+    } finally {
+      setToggling(false);
+    }
+  }
 
   useEffect(() => {
     let stopped = false;
@@ -104,10 +137,22 @@ export function AdminDashboard() {
               : "불러오는 중…"}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={logout} className="gap-1.5">
-          <LogOut className="size-3.5" />
-          로그아웃
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={maintenance ? "destructive" : "outline"}
+            size="sm"
+            onClick={toggleMaintenance}
+            disabled={toggling}
+            className="gap-1.5"
+          >
+            <Wrench className="size-3.5" />
+            {maintenance ? "점검 모드 끄기" : "점검 모드 켜기"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={logout} className="gap-1.5">
+            <LogOut className="size-3.5" />
+            로그아웃
+          </Button>
+        </div>
       </div>
 
       {/* 실행 중 분석 */}

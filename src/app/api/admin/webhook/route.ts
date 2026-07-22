@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   if (!(await isValidAdminSession(req.cookies.get(ADMIN_COOKIE)?.value))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  let body: { url?: string; test?: boolean };
+  let body: { url?: string; test?: boolean; preview?: string };
   try {
     body = await req.json();
   } catch {

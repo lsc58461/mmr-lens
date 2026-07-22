@@ -1,11 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { cache } from "@/lib/cache";
-import {
-  DISCORD_SESSION_COOKIE,
-  getDiscordSession,
-} from "@/lib/discord-auth";
-import { getAccountByRiotId, getSummoner } from "@/lib/riot/client";
-import { insertVerifiedSummoner, isVerifiedSummoner } from "@/lib/store";
+import { DISCORD_SESSION_COOKIE, getDiscordSession } from "@/lib/discord-auth";
+import { getAccountByRiotId } from "@/lib/riot/client";
+import { insertVerifiedSummoner } from "@/lib/store";
 import {
   PLATFORM_LABELS,
   RiotApiError,
@@ -15,26 +11,9 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// 소환사 본인 인증 — 지정된 프로필 아이콘으로 변경했는지 확인하는 방식.
-// step=start: 도전 과제(아이콘 번호) 발급 / step=confirm: 변경 확인 후 인증 완료
-const CHALLENGE_TTL = 60 * 10; // 10분
-const STARTER_ICONS = Array.from({ length: 29 }, (_, i) => i); // 0~28 기본 아이콘
-
-interface Challenge {
-  iconId: number;
-  puuid: number | string;
-}
-
-function challengeKey(platform: string, name: string, tag: string): string {
-  return `verify-challenge:${platform}:${name.toLowerCase()}#${tag.toLowerCase()}`;
-}
-
+// 소환사 인증 — 디스코드 서버 멤버 확인 후 계정 연결.
 export async function POST(req: NextRequest) {
-  let body: {
-    region?: string;
-    riotId?: string;
-    step?: "start" | "confirm" | "link";
-  };
+  let body: { region?: string; riotId?: string };
   try {
     body = await req.json();
   } catch {
@@ -53,87 +32,29 @@ export async function POST(req: NextRequest) {
   const gameName = riotId.slice(0, hash);
   const tagLine = riotId.slice(hash + 1);
 
+  const discord = await getDiscordSession(
+    req.cookies.get(DISCORD_SESSION_COOKIE)?.value,
+  );
+  if (!discord) {
+    return NextResponse.json(
+      { error: "디스코드 인증이 만료됐어요. 다시 로그인해 주세요." },
+      { status: 401 },
+    );
+  }
+
   try {
     const account = await getAccountByRiotId(platform, gameName, tagLine);
-
-    // 디스코드 멤버 인증 후 소환사 연결 (소유 증명 없이 멤버십 기반 등록)
-    if (body.step === "link") {
-      const discord = await getDiscordSession(
-        req.cookies.get(DISCORD_SESSION_COOKIE)?.value,
-      );
-      if (!discord) {
-        return NextResponse.json(
-          { error: "디스코드 인증이 만료됐어요. 다시 로그인해 주세요." },
-          { status: 401 },
-        );
-      }
-      await insertVerifiedSummoner(
-        platform,
-        account.gameName,
-        account.tagLine,
-        account.puuid,
-        discord,
-      );
-      return NextResponse.json({
-        verified: true,
-        name: `${account.gameName}#${account.tagLine}`,
-        discord: discord.username,
-      });
-    }
-
-    if (body.step === "confirm") {
-      const key = challengeKey(platform, gameName, tagLine);
-      const challenge = await cache.get<Challenge>(key);
-      if (!challenge) {
-        return NextResponse.json(
-          { error: "인증 세션이 만료됐어요. 처음부터 다시 시도해 주세요." },
-          { status: 410 },
-        );
-      }
-      const summoner = await getSummoner(platform, account.puuid, true);
-      if (summoner.profileIconId !== challenge.iconId) {
-        return NextResponse.json(
-          {
-            error:
-              "아직 아이콘 변경이 확인되지 않아요. 클라이언트에서 변경 후 잠시 뒤 다시 눌러주세요.",
-          },
-          { status: 409 },
-        );
-      }
-      await insertVerifiedSummoner(
-        platform,
-        account.gameName,
-        account.tagLine,
-        account.puuid,
-      );
-      await cache.set(key, null, 1);
-      return NextResponse.json({
-        verified: true,
-        name: `${account.gameName}#${account.tagLine}`,
-      });
-    }
-
-    // step=start
-    if (await isVerifiedSummoner(platform, gameName, tagLine)) {
-      return NextResponse.json({
-        alreadyVerified: true,
-        name: `${account.gameName}#${account.tagLine}`,
-      });
-    }
-    const current = await getSummoner(platform, account.puuid, true);
-    const candidates = STARTER_ICONS.filter(
-      (i) => i !== current.profileIconId,
-    );
-    const iconId = candidates[Math.floor(Math.random() * candidates.length)];
-    await cache.set<Challenge>(
-      challengeKey(platform, gameName, tagLine),
-      { iconId, puuid: account.puuid },
-      CHALLENGE_TTL,
+    await insertVerifiedSummoner(
+      platform,
+      account.gameName,
+      account.tagLine,
+      account.puuid,
+      discord,
     );
     return NextResponse.json({
-      iconId,
+      verified: true,
       name: `${account.gameName}#${account.tagLine}`,
-      expiresInSec: CHALLENGE_TTL,
+      discord: discord.username,
     });
   } catch (e) {
     if (e instanceof RiotApiError && e.status === 404) {

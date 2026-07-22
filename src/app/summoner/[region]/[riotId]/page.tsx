@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   ArrowDown,
   ArrowUp,
+  BadgeCheck,
   Minus,
   SearchX,
   TrendingUp,
@@ -399,6 +400,12 @@ export default async function SummonerPage({
               />
             )}
             <ShareButton region={region} riotId={decoded} />
+            <Link
+              href={`/verify?summoner=${encodeURIComponent(decoded)}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <BadgeCheck className="size-3.5" />내 계정 인증
+            </Link>
           </div>
         </div>
         <div className="w-full sm:w-80">

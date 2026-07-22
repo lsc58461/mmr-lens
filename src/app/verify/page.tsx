@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 import { BadgeCheck } from "lucide-react";
-import { getDDragonVersion } from "@/lib/ddragon";
 import {
   DISCORD_SESSION_COOKIE,
   getDiscordSession,
@@ -20,10 +19,9 @@ export const metadata = {
 export default async function VerifyPage({
   searchParams,
 }: {
-  searchParams: Promise<{ discord?: string }>;
+  searchParams: Promise<{ discord?: string; summoner?: string }>;
 }) {
-  const { discord } = await searchParams;
-  const ddVersion = await getDDragonVersion();
+  const { discord, summoner } = await searchParams;
   const cookieStore = await cookies();
   const discordUser = await getDiscordSession(
     cookieStore.get(DISCORD_SESSION_COOKIE)?.value,
@@ -45,10 +43,10 @@ export default async function VerifyPage({
         </div>
       </div>
       <VerifyClient
-        ddVersion={ddVersion}
         discordEnabled={isDiscordConfigured()}
         discordUser={discordUser?.username ?? null}
         discordStatus={discord ?? null}
+        prefill={summoner ? decodeURIComponent(summoner) : ""}
       />
     </div>
   );

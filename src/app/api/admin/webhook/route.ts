@@ -33,8 +33,16 @@ export async function POST(req: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        content:
-          "✅ MMR Lens 디스코드 연동 테스트 — 이제 승급/강등 알림이 이 채널로 와요!",
+        content: "✅ MMR Lens 디스코드 연동 완료! 실제 알림은 이렇게 와요 ↓",
+        embeds: [
+          {
+            title: "🎉 Hide on bush#KR1 님 승급!",
+            description: "**챌린저 1655LP** → **챌린저 1720LP**",
+            url: "https://mmr-lens.kro.kr",
+            color: 0x3b82f6,
+            footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
+          },
+        ],
       }),
       signal: AbortSignal.timeout(5_000),
     }).catch(() => null);

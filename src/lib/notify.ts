@@ -65,15 +65,28 @@ export async function notifyRankChangeIfNeeded(
     rankToPoints(next.tier, next.rank, next.lp) >
     rankToPoints(prevSolo.tier, prevSolo.rank, prevSolo.lp);
   const name = `${summoner.game_name}#${summoner.tag_line}`;
-  const url = `https://mmr-lens.kro.kr/summoner/${platform}/${encodeURIComponent(name)}`;
-  const content = up
-    ? `🎉 **${name}** 님이 ${label(prevSolo)} → **${label(next)}** 로 승급했어요!\n${url}`
-    : `📉 **${name}** 님이 ${label(prevSolo)} → **${label(next)}** 로 강등됐어요…\n${url}`;
+  const encoded = encodeURIComponent(name);
+  const url = `https://mmr-lens.kro.kr/summoner/${platform}/${encoded}`;
+  // 공유 카드 이미지를 임베드에 첨부 (디스코드 프록시 캐시 우회 위해 캐시버스터)
+  const image = `https://mmr-lens.kro.kr/api/share-image?region=${platform}&riotId=${encoded}&v=${Date.now()}`;
 
   await fetch(webhook, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({
+      embeds: [
+        {
+          title: up
+            ? `🎉 ${name} 님 승급!`
+            : `📉 ${name} 님 강등`,
+          description: `**${label(prevSolo)}** → **${label(next)}**`,
+          url,
+          color: up ? 0x3b82f6 : 0xef4444, // 승급 파랑 / 강등 빨강
+          image: { url: image },
+          footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
+        },
+      ],
+    }),
     signal: AbortSignal.timeout(5_000),
   }).catch(() => {});
 }

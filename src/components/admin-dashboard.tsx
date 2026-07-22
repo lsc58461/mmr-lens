@@ -126,6 +126,7 @@ export function AdminDashboard() {
     game_name: string;
     tag_line: string;
     active: boolean;
+    discord_username: string | null;
   }
   const [verified, setVerified] = useState<Verified[]>([]);
 
@@ -537,8 +538,15 @@ export function AdminDashboard() {
                   key={`${v.platform}:${v.game_name}#${v.tag_line}`}
                   className="flex items-center justify-between gap-2 py-2 text-sm"
                 >
-                  <span className={v.active ? "" : "text-muted-foreground line-through"}>
+                  <span
+                    className={`min-w-0 truncate ${v.active ? "" : "text-muted-foreground line-through"}`}
+                  >
                     {v.game_name}#{v.tag_line}
+                    {v.discord_username && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        @{v.discord_username}
+                      </span>
+                    )}
                   </span>
                   <Button
                     variant="outline"

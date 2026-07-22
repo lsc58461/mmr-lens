@@ -382,15 +382,20 @@ export async function insertVerifiedSummoner(
   gameName: string,
   tagLine: string,
   puuid: string,
+  discord?: { id: string; username: string },
 ): Promise<void> {
   const sql = await getSql();
   await sql`
     INSERT INTO verified_summoners
-      (platform, game_name_lower, tag_line_lower, game_name, tag_line, puuid)
+      (platform, game_name_lower, tag_line_lower, game_name, tag_line, puuid,
+       discord_user_id, discord_username)
     VALUES (${platform}, ${gameName.toLowerCase()}, ${tagLine.toLowerCase()},
-            ${gameName}, ${tagLine}, ${puuid})
+            ${gameName}, ${tagLine}, ${puuid},
+            ${discord?.id ?? null}, ${discord?.username ?? null})
     ON CONFLICT (platform, game_name_lower, tag_line_lower) DO UPDATE
-    SET puuid = EXCLUDED.puuid, active = true, verified_at = now()`;
+    SET puuid = EXCLUDED.puuid, active = true, verified_at = now(),
+        discord_user_id = COALESCE(EXCLUDED.discord_user_id, verified_summoners.discord_user_id),
+        discord_username = COALESCE(EXCLUDED.discord_username, verified_summoners.discord_username)`;
 }
 
 export async function isVerifiedSummoner(
@@ -413,12 +418,13 @@ export interface VerifiedRow {
   tag_line: string;
   active: boolean;
   verified_at: string;
+  discord_username: string | null;
 }
 
 export async function listVerifiedSummoners(): Promise<VerifiedRow[]> {
   const sql = await getSql();
   const rows = await sql`
-    SELECT platform, game_name, tag_line, active, verified_at
+    SELECT platform, game_name, tag_line, active, verified_at, discord_username
     FROM verified_summoners ORDER BY verified_at DESC`;
   return rows as unknown as VerifiedRow[];
 }

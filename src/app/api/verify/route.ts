@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cache } from "@/lib/cache";
+import {
+  DISCORD_SESSION_COOKIE,
+  getDiscordSession,
+} from "@/lib/discord-auth";
 import { getAccountByRiotId, getSummoner } from "@/lib/riot/client";
 import { insertVerifiedSummoner, isVerifiedSummoner } from "@/lib/store";
 import {
@@ -26,7 +30,11 @@ function challengeKey(platform: string, name: string, tag: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  let body: { region?: string; riotId?: string; step?: "start" | "confirm" };
+  let body: {
+    region?: string;
+    riotId?: string;
+    step?: "start" | "confirm" | "link";
+  };
   try {
     body = await req.json();
   } catch {
@@ -47,6 +55,31 @@ export async function POST(req: NextRequest) {
 
   try {
     const account = await getAccountByRiotId(platform, gameName, tagLine);
+
+    // 디스코드 멤버 인증 후 소환사 연결 (소유 증명 없이 멤버십 기반 등록)
+    if (body.step === "link") {
+      const discord = await getDiscordSession(
+        req.cookies.get(DISCORD_SESSION_COOKIE)?.value,
+      );
+      if (!discord) {
+        return NextResponse.json(
+          { error: "디스코드 인증이 만료됐어요. 다시 로그인해 주세요." },
+          { status: 401 },
+        );
+      }
+      await insertVerifiedSummoner(
+        platform,
+        account.gameName,
+        account.tagLine,
+        account.puuid,
+        discord,
+      );
+      return NextResponse.json({
+        verified: true,
+        name: `${account.gameName}#${account.tagLine}`,
+        discord: discord.username,
+      });
+    }
 
     if (body.step === "confirm") {
       const key = challengeKey(platform, gameName, tagLine);

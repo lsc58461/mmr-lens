@@ -115,7 +115,7 @@ async function initSchema(sql: Sql): Promise<void> {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
 
-    -- 인증된 소환사 (프로필 아이콘 변경 방식 본인 인증) — 디스코드 알림 대상
+    -- 인증된 소환사 (디스코드 멤버 인증 또는 아이콘 인증) — 디스코드 알림 대상
     CREATE TABLE IF NOT EXISTS verified_summoners (
       platform text NOT NULL,
       game_name_lower text NOT NULL,
@@ -127,6 +127,8 @@ async function initSchema(sql: Sql): Promise<void> {
       verified_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (platform, game_name_lower, tag_line_lower)
     );
+    ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS discord_user_id text;
+    ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS discord_username text;
   `);
 }
 

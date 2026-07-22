@@ -330,11 +330,16 @@ export async function markDeepJobRunning(
   );
 }
 
-/** 정밀 분석 본체. 진행률을 캐시에 기록하며 완료 시 결과를 저장한다. */
+/**
+ * 정밀 분석 본체. 진행률을 캐시에 기록하며 완료 시 결과를 저장한다.
+ * allowNotify=true면 완료 후 디스코드 마일스톤 알림을 체크한다
+ * (유저 트리거 정밀분석만 true, 새벽 크론은 false).
+ */
 export async function runDeepAnalysis(
   platform: PlatformRegion,
   gameName: string,
   tagLine: string,
+  allowNotify = false,
 ): Promise<void> {
   const jk = jobKey(platform, gameName, tagLine);
   let lastWritten = 0;
@@ -371,6 +376,23 @@ export async function runDeepAnalysis(
       { state: "done", progress: 1, updatedAt: Date.now() },
       JOB_TTL,
     );
+    if (allowNotify) {
+      const solo = result.soloEntry
+        ? {
+            tier: result.soloEntry.tier,
+            rank: result.soloEntry.rank,
+            lp: result.soloEntry.leaguePoints,
+          }
+        : null;
+      const { checkMilestones } = await import("@/lib/notify");
+      await checkMilestones(
+        platform,
+        gameName,
+        tagLine,
+        solo,
+        result.recentStreak,
+      ).catch(() => {});
+    }
   } catch {
     await cache
       .set<DeepJob>(

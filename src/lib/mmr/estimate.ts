@@ -69,6 +69,7 @@ export interface MmrEstimate {
   errorMargin: number | null; // 로비 표본 분산 기반 95% 오차범위(±pt)
   gap: number | null; // 추정 - 현재 (양수면 티어보다 실력이 높다는 뜻)
   recentWinrate: number | null;
+  recentStreak: number; // 최근 연승(+)/연패(-)
   matches: MatchSample[];
   sampledPlayers: number;
   duoExcludedCount: number; // 분석에서 제외된 듀오 추정 경기 수
@@ -311,6 +312,15 @@ export async function estimateMmr(
   const wins = analyzed.filter((s) => s.win).length;
   const recentWinrate = played ? wins / played : null;
 
+  // 최근 연승/연패 — 최신 경기부터 연속 (양수=연승, 음수=연패)
+  let recentStreak = 0;
+  for (const s of matchSamples) {
+    if (recentStreak === 0) recentStreak = s.win ? 1 : -1;
+    else if (s.win && recentStreak > 0) recentStreak++;
+    else if (!s.win && recentStreak < 0) recentStreak--;
+    else break;
+  }
+
   const totalSamples = matchSamples.reduce((a, s) => a + s.sampleSize, 0);
   const confidence =
     totalSamples >= 30 ? "high" : totalSamples >= 15 ? "medium" : "low";
@@ -334,6 +344,7 @@ export async function estimateMmr(
         ? Math.round(estimatedPoints - currentPoints)
         : null,
     recentWinrate,
+    recentStreak,
     matches: matchSamples,
     sampledPlayers: pointsByPuuid.size,
     duoExcludedCount: duoFlags.filter(Boolean).length,

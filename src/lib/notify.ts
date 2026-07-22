@@ -1,87 +1,74 @@
-// 디스코드 승급/강등 알림 — 랭크 스냅샷이 갱신될 때 티어·디비전 변화를 감지해
-// 웹훅으로 전송한다. DISCORD_WEBHOOK_URL 미설정 시 조용히 비활성.
-// 대상: 최근 30일 내 검색된 소환사만 (참가자 표본 전체로 알림이 가면 소음)
+// 디스코드 마일스톤 알림 — 정밀분석(유저 트리거) 완료 시점에만 호출된다.
+// (새벽 크론의 정밀분석은 호출하지 않아 알림이 안 나간다)
+// 인증된 소환사의 마지막 알림 상태와 비교해 승급/강등·시즌 최고·연승을 감지한다.
+// 상태를 스냅샷이 아니라 verified_summoners에 저장하므로, 크론이 스냅샷을
+// 갱신해도 승급을 놓치지 않는다(다음 유저 방문 때 감지).
 
 import "server-only";
 import { TIER_LABELS, rankToPoints } from "./mmr/rank";
 import {
-  findSummonerByPuuid,
   getSetting,
-  isVerifiedSummoner,
+  getVerifiedNotifyState,
+  updateVerifiedNotifyState,
 } from "./store";
-import type { LeagueEntry, PlatformRegion } from "./riot/types";
+import type { PlatformRegion } from "./riot/types";
 
 export const WEBHOOK_SETTING_KEY = "discord-webhook";
+const STREAK_MILESTONE = 5; // 5연승 단위로 알림 (5·10·15…)
 
 export async function getWebhookUrl(): Promise<string | null> {
   const stored = await getSetting<string>(WEBHOOK_SETTING_KEY).catch(() => null);
   return stored || process.env.DISCORD_WEBHOOK_URL || null;
 }
 
-interface SoloRank {
+export interface SoloRank {
   tier: string;
   rank: string;
   lp: number;
 }
 
-function soloOf(entries: LeagueEntry[]): SoloRank | null {
-  const e = entries.find((x) => x.queueType === "RANKED_SOLO_5x5");
-  return e ? { tier: e.tier, rank: e.rank, lp: e.leaguePoints } : null;
+function divNum(rank: string): string {
+  return { IV: "4", III: "3", II: "2", I: "1" }[rank] ?? rank;
 }
 
+/** SoloRank → 표시 라벨 */
 function label(r: SoloRank): string {
   const apex = ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(r.tier);
   return apex
     ? `${TIER_LABELS[r.tier]} ${r.lp}LP`
-    : `${TIER_LABELS[r.tier]} ${{ IV: 4, III: 3, II: 2, I: 1 }[r.rank as "IV"] ?? r.rank}`;
+    : `${TIER_LABELS[r.tier]} ${divNum(r.rank)}`;
 }
 
-export async function notifyRankChangeIfNeeded(
-  fp: string,
-  platform: PlatformRegion,
-  puuid: string,
-  prevSolo: SoloRank | null,
-  newEntries: LeagueEntry[],
+/** 이전 상태(티어/디비전/포인트)만으로 라벨 — LP는 포인트에서 역산 */
+function labelFromState(tier: string, rank: string, points: number): string {
+  const apex = ["MASTER", "GRANDMASTER", "CHALLENGER"].includes(tier);
+  return apex
+    ? `${TIER_LABELS[tier]} ${Math.max(0, points - 2800)}LP`
+    : `${TIER_LABELS[tier]} ${divNum(rank)}`;
+}
+
+interface Embed {
+  title: string;
+  description: string;
+  color: number;
+}
+
+async function send(
+  webhook: string,
+  e: Embed,
+  url: string,
+  image: string,
 ): Promise<void> {
-  if (!prevSolo) return;
-  const webhook = await getWebhookUrl();
-  if (!webhook) return;
-  const next = soloOf(newEntries);
-  if (!next) return;
-  // 티어 또는 디비전이 바뀐 경우만 (LP 변동만은 소음)
-  if (prevSolo.tier === next.tier && prevSolo.rank === next.rank) return;
-
-  const summoner = await findSummonerByPuuid(fp, puuid).catch(() => null);
-  if (!summoner) return;
-  // 본인 인증(/verify)을 마친 소환사만 알림 대상
-  const verified = await isVerifiedSummoner(
-    platform,
-    summoner.game_name,
-    summoner.tag_line,
-  ).catch(() => false);
-  if (!verified) return;
-
-  const up =
-    rankToPoints(next.tier, next.rank, next.lp) >
-    rankToPoints(prevSolo.tier, prevSolo.rank, prevSolo.lp);
-  const name = `${summoner.game_name}#${summoner.tag_line}`;
-  const encoded = encodeURIComponent(name);
-  const url = `https://mmr-lens.kro.kr/summoner/${platform}/${encoded}`;
-  // 공유 카드 이미지를 임베드에 첨부 (디스코드 프록시 캐시 우회 위해 캐시버스터)
-  const image = `https://mmr-lens.kro.kr/api/share-image?region=${platform}&riotId=${encoded}&v=${Date.now()}`;
-
   await fetch(webhook, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       embeds: [
         {
-          title: up
-            ? `🎉 ${name} 님 승급!`
-            : `📉 ${name} 님 강등`,
-          description: `**${label(prevSolo)}** → **${label(next)}**`,
+          title: e.title,
+          description: e.description,
           url,
-          color: up ? 0x3b82f6 : 0xef4444, // 승급 파랑 / 강등 빨강
+          color: e.color,
           image: { url: image },
           footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
         },
@@ -89,4 +76,91 @@ export async function notifyRankChangeIfNeeded(
     }),
     signal: AbortSignal.timeout(5_000),
   }).catch(() => {});
+}
+
+/**
+ * 인증된 소환사의 마일스톤(승급/강등·시즌 최고·연승)을 감지해 알림.
+ * @param solo 현재 솔로랭크 (언랭이면 null)
+ * @param streak 최근 연승(+)/연패(-)
+ */
+export async function checkMilestones(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  solo: SoloRank | null,
+  streak: number,
+): Promise<void> {
+  if (!solo) return;
+  const state = await getVerifiedNotifyState(platform, gameName, tagLine).catch(
+    () => null,
+  );
+  if (!state) return; // 미인증/비활성
+
+  const points = rankToPoints(solo.tier, solo.rank, solo.lp);
+  const name = `${gameName}#${tagLine}`;
+  const encoded = encodeURIComponent(name);
+  const url = `https://mmr-lens.kro.kr/summoner/${platform}/${encoded}`;
+  const image = `https://mmr-lens.kro.kr/api/share-image?region=${platform}&riotId=${encoded}&v=${Date.now()}`;
+
+  const events: Embed[] = [];
+  const first = state.last_tier === null;
+  const isBest = state.best_points === null || points > state.best_points;
+
+  if (!first) {
+    const prevPoints = state.last_points ?? 0;
+    const changed =
+      state.last_tier !== solo.tier || state.last_rank !== solo.rank;
+    if (changed) {
+      const prev = labelFromState(state.last_tier!, state.last_rank!, prevPoints);
+      const now = label(solo);
+      if (points > prevPoints) {
+        events.push({
+          title: isBest
+            ? `🏆 ${name} 님 시즌 최고 달성! (${now})`
+            : `🎉 ${name} 님 승급!`,
+          description: `**${prev}** → **${now}**`,
+          color: 0x3b82f6,
+        });
+      } else {
+        events.push({
+          title: `📉 ${name} 님 강등`,
+          description: `**${prev}** → **${now}**`,
+          color: 0xef4444,
+        });
+      }
+    } else if (isBest && points > prevPoints) {
+      // 같은 티어·디비전에서 시즌 최고 경신 (마스터+ LP 상승 등)
+      events.push({
+        title: `🏆 ${name} 님 시즌 최고 갱신!`,
+        description: `**${label(solo)}**`,
+        color: 0xfbbf24,
+      });
+    }
+    // 연승 마일스톤 (5·10·15… 도달마다 1회)
+    if (
+      streak >= STREAK_MILESTONE &&
+      Math.floor(streak / STREAK_MILESTONE) >
+        Math.floor(state.notified_streak / STREAK_MILESTONE)
+    ) {
+      events.push({
+        title: `🔥 ${name} 님 ${streak}연승 중!`,
+        description: "무서운 상승세예요. 지금이 점수 올릴 타이밍!",
+        color: 0xf59e0b,
+      });
+    }
+  }
+
+  // 상태 갱신 (첫 관측이면 알림 없이 기준선만 저장)
+  await updateVerifiedNotifyState(platform, gameName, tagLine, {
+    last_tier: solo.tier,
+    last_rank: solo.rank,
+    last_points: points,
+    best_points: Math.max(state.best_points ?? 0, points),
+    notified_streak: streak > 0 ? streak : 0,
+  }).catch(() => {});
+
+  if (events.length === 0) return;
+  const webhook = await getWebhookUrl();
+  if (!webhook) return;
+  for (const e of events) await send(webhook, e, url, image);
 }

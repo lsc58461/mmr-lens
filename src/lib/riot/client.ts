@@ -8,7 +8,6 @@ import {
   getMatchRow,
   insertLeagueSnapshot,
   latestLeagueSnapshot,
-  latestLeagueSnapshotAny,
   listLeagueSnapshots,
   saveMatchRow,
   updateSummonerProfile,
@@ -161,24 +160,8 @@ export async function getLeagueEntries(
   const entries = await riotFetch<LeagueEntry[]>(
     `https://${platform}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`,
   );
-  // 승급/강등 감지(디스코드 알림)를 위해 이전 스냅샷과 비교 후 적재
-  const prev = await latestLeagueSnapshotAny(keyFp(), platform, puuid).catch(
-    () => null,
-  );
+  // 히스토리 적재 (디스코드 알림은 정밀분석 완료 시점에 checkMilestones가 담당)
   await insertLeagueSnapshot(keyFp(), platform, puuid, entries).catch(() => {});
-  if (prev?.solo_tier && prev.solo_rank !== null && prev.solo_lp !== null) {
-    void import("@/lib/notify").then((m) =>
-      m
-        .notifyRankChangeIfNeeded(
-          keyFp(),
-          platform,
-          puuid,
-          { tier: prev.solo_tier!, rank: prev.solo_rank!, lp: prev.solo_lp! },
-          entries,
-        )
-        .catch(() => {}),
-    );
-  }
   return entries;
 }
 

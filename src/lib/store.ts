@@ -443,6 +443,47 @@ export async function setVerifiedActive(
       AND tag_line_lower = ${tagLine.toLowerCase()}`;
 }
 
+export interface VerifiedNotifyState {
+  last_tier: string | null;
+  last_rank: string | null;
+  last_points: number | null;
+  best_points: number | null;
+  notified_streak: number;
+}
+
+/** 인증+활성 소환사의 알림 상태 조회 (미인증/비활성이면 null) */
+export async function getVerifiedNotifyState(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<VerifiedNotifyState | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT last_tier, last_rank, last_points, best_points, notified_streak
+    FROM verified_summoners
+    WHERE platform = ${platform} AND active = true
+      AND game_name_lower = ${gameName.toLowerCase()}
+      AND tag_line_lower = ${tagLine.toLowerCase()}`;
+  return (rows[0] as VerifiedNotifyState | undefined) ?? null;
+}
+
+export async function updateVerifiedNotifyState(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  s: VerifiedNotifyState,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    UPDATE verified_summoners
+    SET last_tier = ${s.last_tier}, last_rank = ${s.last_rank},
+        last_points = ${s.last_points}, best_points = ${s.best_points},
+        notified_streak = ${s.notified_streak}
+    WHERE platform = ${platform}
+      AND game_name_lower = ${gameName.toLowerCase()}
+      AND tag_line_lower = ${tagLine.toLowerCase()}`;
+}
+
 // ── 앱 설정 ─────────────────────────────────────────────
 
 export async function getSetting<T>(key: string): Promise<T | null> {

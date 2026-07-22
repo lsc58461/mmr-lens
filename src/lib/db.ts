@@ -129,6 +129,12 @@ async function initSchema(sql: Sql): Promise<void> {
     );
     ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS discord_user_id text;
     ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS discord_username text;
+    -- 알림 상태 (마지막 알림 기준 랭크·시즌 최고·연승 마일스톤)
+    ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS last_tier text;
+    ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS last_rank text;
+    ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS last_points int;
+    ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS best_points int;
+    ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS notified_streak int NOT NULL DEFAULT 0;
   `);
 }
 

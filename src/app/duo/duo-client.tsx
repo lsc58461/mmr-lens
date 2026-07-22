@@ -82,7 +82,8 @@ export function DuoClient() {
 
   return (
     <div className="space-y-5">
-      <Card>
+      {/* overflow-visible: 자동완성 드롭다운이 카드 밖으로 나올 수 있게 */}
+      <Card className="overflow-visible">
         <CardContent>
           <form onSubmit={analyze} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">

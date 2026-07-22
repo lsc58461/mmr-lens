@@ -73,7 +73,8 @@ export function RecapClient() {
 
   return (
     <div className="space-y-5">
-      <Card>
+      {/* overflow-visible: 자동완성 드롭다운이 카드 밖으로 나올 수 있게 */}
+      <Card className="overflow-visible">
         <CardContent>
           <form onSubmit={load} className="flex gap-2">
             <SummonerAutocomplete

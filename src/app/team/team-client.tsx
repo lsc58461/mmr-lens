@@ -164,7 +164,8 @@ export function TeamClient() {
 
   return (
     <div className="space-y-5">
-      <Card>
+      {/* overflow-visible: 자동완성 드롭다운이 카드 밖으로 나올 수 있게 */}
+      <Card className="overflow-visible">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Users className="size-4 text-primary" />

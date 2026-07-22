@@ -7,7 +7,7 @@ import { TIER_LABELS, rankToPoints } from "./mmr/rank";
 import {
   findSummonerByPuuid,
   getSetting,
-  isRecentlySearched,
+  isVerifiedSummoner,
 } from "./store";
 import type { LeagueEntry, PlatformRegion } from "./riot/types";
 
@@ -53,12 +53,13 @@ export async function notifyRankChangeIfNeeded(
 
   const summoner = await findSummonerByPuuid(fp, puuid).catch(() => null);
   if (!summoner) return;
-  const tracked = await isRecentlySearched(
+  // 본인 인증(/verify)을 마친 소환사만 알림 대상
+  const verified = await isVerifiedSummoner(
     platform,
     summoner.game_name,
     summoner.tag_line,
   ).catch(() => false);
-  if (!tracked) return;
+  if (!verified) return;
 
   const up =
     rankToPoints(next.tier, next.rank, next.lp) >

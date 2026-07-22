@@ -114,6 +114,19 @@ async function initSchema(sql: Sql): Promise<void> {
       value jsonb NOT NULL,
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+
+    -- 인증된 소환사 (프로필 아이콘 변경 방식 본인 인증) — 디스코드 알림 대상
+    CREATE TABLE IF NOT EXISTS verified_summoners (
+      platform text NOT NULL,
+      game_name_lower text NOT NULL,
+      tag_line_lower text NOT NULL,
+      game_name text NOT NULL,
+      tag_line text NOT NULL,
+      puuid text NOT NULL,
+      active boolean NOT NULL DEFAULT true,
+      verified_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (platform, game_name_lower, tag_line_lower)
+    );
   `);
 }
 

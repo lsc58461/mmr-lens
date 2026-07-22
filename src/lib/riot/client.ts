@@ -108,12 +108,13 @@ export async function getAccountByRiotId(
   return account;
 }
 
-/** 소환사 프로필(아이콘/레벨) 조회 */
+/** 소환사 프로필(아이콘/레벨) 조회. bypassCache=true면 항상 최신(아이콘 인증용) */
 export async function getSummoner(
   platform: PlatformRegion,
   puuid: string,
+  bypassCache = false,
 ): Promise<{ profileIconId: number; summonerLevel: number }> {
-  const row = await findSummonerByPuuid(keyFp(), puuid);
+  const row = bypassCache ? null : await findSummonerByPuuid(keyFp(), puuid);
   if (
     row?.profile_icon_id != null &&
     row.summoner_level != null &&

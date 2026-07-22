@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Activity,
+  BadgeCheck,
   Bell,
   Clock,
   Database,
@@ -119,6 +120,42 @@ export function AdminDashboard() {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [webhookSaving, setWebhookSaving] = useState(false);
 
+  // 인증된 소환사
+  interface Verified {
+    platform: string;
+    game_name: string;
+    tag_line: string;
+    active: boolean;
+  }
+  const [verified, setVerified] = useState<Verified[]>([]);
+
+  async function loadVerified() {
+    try {
+      const res = await fetch("/api/admin/verified");
+      if (res.ok) setVerified((await res.json()).items);
+    } catch {}
+  }
+
+  async function toggleVerified(v: Verified) {
+    try {
+      const res = await fetch("/api/admin/verified", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          platform: v.platform,
+          gameName: v.game_name,
+          tagLine: v.tag_line,
+          active: !v.active,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(!v.active ? "알림을 복구했어요" : "알림을 해제했어요");
+      loadVerified();
+    } catch {
+      toast.error("변경에 실패했어요");
+    }
+  }
+
   // 점검 설정
   const [mnt, setMnt] = useState<Maintenance | null>(null);
   const [reason, setReason] = useState("");
@@ -130,6 +167,10 @@ export function AdminDashboard() {
     fetch("/api/admin/webhook")
       .then((r) => r.json())
       .then((d: { url?: string }) => setWebhookUrl(d.url ?? ""))
+      .catch(() => {});
+    fetch("/api/admin/verified")
+      .then((r) => r.json())
+      .then((d: { items?: Verified[] }) => setVerified(d.items ?? []))
       .catch(() => {});
   }, []);
 
@@ -474,6 +515,46 @@ export function AdminDashboard() {
               테스트 발송
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* 인증된 소환사 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BadgeCheck className="size-4 text-emerald-500" />
+            인증된 소환사 ({verified.filter((v) => v.active).length})
+          </CardTitle>
+          <CardDescription>
+            /verify에서 본인 인증한 계정 — 디스코드 승급/강등 알림 대상
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {verified.length ? (
+            <div className="divide-y divide-border/60">
+              {verified.map((v) => (
+                <div
+                  key={`${v.platform}:${v.game_name}#${v.tag_line}`}
+                  className="flex items-center justify-between gap-2 py-2 text-sm"
+                >
+                  <span className={v.active ? "" : "text-muted-foreground line-through"}>
+                    {v.game_name}#{v.tag_line}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => toggleVerified(v)}
+                  >
+                    {v.active ? "알림 해제" : "복구"}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="py-2 text-sm text-muted-foreground">
+              아직 인증한 소환사가 없어요
+            </p>
+          )}
         </CardContent>
       </Card>
 

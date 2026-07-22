@@ -375,6 +375,68 @@ export async function listMatchesForPuuid(
   }));
 }
 
+// ── 인증된 소환사 (디스코드 알림 대상) ───────────────────
+
+export async function insertVerifiedSummoner(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  puuid: string,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO verified_summoners
+      (platform, game_name_lower, tag_line_lower, game_name, tag_line, puuid)
+    VALUES (${platform}, ${gameName.toLowerCase()}, ${tagLine.toLowerCase()},
+            ${gameName}, ${tagLine}, ${puuid})
+    ON CONFLICT (platform, game_name_lower, tag_line_lower) DO UPDATE
+    SET puuid = EXCLUDED.puuid, active = true, verified_at = now()`;
+}
+
+export async function isVerifiedSummoner(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<boolean> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT 1 FROM verified_summoners
+    WHERE platform = ${platform} AND active = true
+      AND game_name_lower = ${gameName.toLowerCase()}
+      AND tag_line_lower = ${tagLine.toLowerCase()}`;
+  return rows.length > 0;
+}
+
+export interface VerifiedRow {
+  platform: PlatformRegion;
+  game_name: string;
+  tag_line: string;
+  active: boolean;
+  verified_at: string;
+}
+
+export async function listVerifiedSummoners(): Promise<VerifiedRow[]> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT platform, game_name, tag_line, active, verified_at
+    FROM verified_summoners ORDER BY verified_at DESC`;
+  return rows as unknown as VerifiedRow[];
+}
+
+export async function setVerifiedActive(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  active: boolean,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    UPDATE verified_summoners SET active = ${active}
+    WHERE platform = ${platform}
+      AND game_name_lower = ${gameName.toLowerCase()}
+      AND tag_line_lower = ${tagLine.toLowerCase()}`;
+}
+
 // ── 앱 설정 ─────────────────────────────────────────────
 
 export async function getSetting<T>(key: string): Promise<T | null> {

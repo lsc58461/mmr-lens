@@ -103,6 +103,15 @@ export default function RootLayout({
             {children}
           </main>
           <footer className="border-t py-4 text-center text-xs text-muted-foreground">
+            <div className="mb-1.5 flex items-center justify-center gap-3">
+              <Link href="/updates" className="hover:text-foreground hover:underline">
+                업데이트 내역
+              </Link>
+              <span aria-hidden>·</span>
+              <Link href="/faq" className="hover:text-foreground hover:underline">
+                자주 묻는 질문
+              </Link>
+            </div>
             MMR Lens는 Riot Games의 공식 서비스가 아니며, 추정치는 참고용입니다.
           </footer>
           <Toaster />

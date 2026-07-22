@@ -14,8 +14,8 @@ async function isMaintenanceOn(origin: string): Promise<boolean> {
     const res = await fetch(`${origin}/api/maintenance`, {
       signal: AbortSignal.timeout(3_000),
     });
-    const data: { on: boolean } = await res.json();
-    cached = { on: data.on === true, at: Date.now() };
+    const data: { active: boolean } = await res.json();
+    cached = { on: data.active === true, at: Date.now() };
   } catch {
     // 조회 실패 시 서비스를 막지 않는다
     cached = { on: false, at: Date.now() };

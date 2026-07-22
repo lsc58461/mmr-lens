@@ -1,0 +1,307 @@
+// 도메인 테이블 저장 계층. 신선도(TTL) 판단은 타임스탬프 컬럼 + 호출부 비교로 한다.
+// puuid가 들어가는 테이블(summoners/matches/league_snapshots)은 API 키 지문(fp)으로 스코프.
+
+import "server-only";
+import { getSql } from "./db";
+import type { MmrEstimate } from "./mmr/estimate";
+import type { LeagueEntry, MatchInfo, PlatformRegion } from "./riot/types";
+
+const fresh = (updatedAt: Date | string, maxAgeMs: number): boolean =>
+  Date.now() - new Date(updatedAt).getTime() < maxAgeMs;
+
+// ── 소환사 ──────────────────────────────────────────────
+
+export interface SummonerRow {
+  puuid: string;
+  game_name: string;
+  tag_line: string;
+  profile_icon_id: number | null;
+  summoner_level: number | null;
+  updated_at: string;
+}
+
+export async function findSummonerByName(
+  fp: string,
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  maxAgeMs: number,
+): Promise<SummonerRow | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT puuid, game_name, tag_line, profile_icon_id, summoner_level, updated_at
+    FROM summoners
+    WHERE fp = ${fp} AND platform = ${platform}
+      AND lower(game_name) = ${gameName.toLowerCase()}
+      AND lower(tag_line) = ${tagLine.toLowerCase()}`;
+  const row = rows[0] as SummonerRow | undefined;
+  return row && fresh(row.updated_at, maxAgeMs) ? row : null;
+}
+
+export async function findSummonerByPuuid(
+  fp: string,
+  puuid: string,
+): Promise<SummonerRow | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT puuid, game_name, tag_line, profile_icon_id, summoner_level, updated_at
+    FROM summoners WHERE fp = ${fp} AND puuid = ${puuid}`;
+  return (rows[0] as SummonerRow | undefined) ?? null;
+}
+
+export async function upsertSummonerNames(
+  fp: string,
+  platform: PlatformRegion,
+  puuid: string,
+  gameName: string,
+  tagLine: string,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO summoners (fp, puuid, platform, game_name, tag_line)
+    VALUES (${fp}, ${puuid}, ${platform}, ${gameName}, ${tagLine})
+    ON CONFLICT (fp, puuid) DO UPDATE
+    SET game_name = EXCLUDED.game_name, tag_line = EXCLUDED.tag_line,
+        platform = EXCLUDED.platform, updated_at = now()`;
+}
+
+export async function updateSummonerProfile(
+  fp: string,
+  puuid: string,
+  profileIconId: number,
+  summonerLevel: number,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    UPDATE summoners
+    SET profile_icon_id = ${profileIconId}, summoner_level = ${summonerLevel},
+        updated_at = now()
+    WHERE fp = ${fp} AND puuid = ${puuid}`;
+}
+
+// ── 매치 (불변) ─────────────────────────────────────────
+
+export async function getMatchRow(
+  fp: string,
+  matchId: string,
+): Promise<MatchInfo | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT match_id, game_creation, game_duration, queue_id, participants
+    FROM matches WHERE fp = ${fp} AND match_id = ${matchId}`;
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    matchId: r.match_id as string,
+    gameCreation: Number(r.game_creation),
+    gameDuration: r.game_duration as number,
+    queueId: r.queue_id as number,
+    participants: r.participants as MatchInfo["participants"],
+  };
+}
+
+export async function saveMatchRow(
+  fp: string,
+  platform: PlatformRegion,
+  match: MatchInfo,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO matches (fp, match_id, platform, game_creation, game_duration, queue_id, participants)
+    VALUES (${fp}, ${match.matchId}, ${platform}, ${match.gameCreation},
+            ${match.gameDuration}, ${match.queueId}, ${sql.json(match.participants as never)})
+    ON CONFLICT (fp, match_id) DO NOTHING`;
+}
+
+// ── 랭크 스냅샷 (히스토리 적재) ─────────────────────────
+
+export async function latestLeagueSnapshot(
+  fp: string,
+  platform: PlatformRegion,
+  puuid: string,
+  maxAgeMs: number,
+): Promise<LeagueEntry[] | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT entries, created_at FROM league_snapshots
+    WHERE fp = ${fp} AND platform = ${platform} AND puuid = ${puuid}
+    ORDER BY created_at DESC LIMIT 1`;
+  const r = rows[0];
+  if (!r || !fresh(r.created_at as string, maxAgeMs)) return null;
+  return r.entries as LeagueEntry[];
+}
+
+export async function insertLeagueSnapshot(
+  fp: string,
+  platform: PlatformRegion,
+  puuid: string,
+  entries: LeagueEntry[],
+): Promise<void> {
+  const sql = await getSql();
+  const solo = entries.find((e) => e.queueType === "RANKED_SOLO_5x5");
+  await sql`
+    INSERT INTO league_snapshots
+      (fp, platform, puuid, solo_tier, solo_rank, solo_lp, solo_wins, solo_losses, entries)
+    VALUES (${fp}, ${platform}, ${puuid}, ${solo?.tier ?? null}, ${solo?.rank ?? null},
+            ${solo?.leaguePoints ?? null}, ${solo?.wins ?? null}, ${solo?.losses ?? null},
+            ${sql.json(entries as never)})`;
+}
+
+// ── 분석 결과 ───────────────────────────────────────────
+
+export async function getAnalysis(
+  kind: "quick" | "deep",
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<MmrEstimate | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT result FROM analyses
+    WHERE platform = ${platform} AND kind = ${kind}
+      AND game_name_lower = ${gameName.toLowerCase()}
+      AND tag_line_lower = ${tagLine.toLowerCase()}`;
+  return (rows[0]?.result as MmrEstimate | undefined) ?? null;
+}
+
+export async function saveAnalysis(
+  kind: "quick" | "deep",
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+  result: MmrEstimate,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO analyses
+      (platform, game_name_lower, tag_line_lower, kind, game_name, tag_line,
+       algo_version, latest_match_id, analyzed_at, result)
+    VALUES (${platform}, ${gameName.toLowerCase()}, ${tagLine.toLowerCase()}, ${kind},
+            ${result.account.gameName}, ${result.account.tagLine},
+            ${result.algoVersion ?? null}, ${result.latestMatchId ?? null},
+            ${result.analyzedAt ? new Date(result.analyzedAt) : null},
+            ${sql.json(result as never)})
+    ON CONFLICT (platform, game_name_lower, tag_line_lower, kind) DO UPDATE
+    SET game_name = EXCLUDED.game_name, tag_line = EXCLUDED.tag_line,
+        algo_version = EXCLUDED.algo_version, latest_match_id = EXCLUDED.latest_match_id,
+        analyzed_at = EXCLUDED.analyzed_at, result = EXCLUDED.result, updated_at = now()`;
+}
+
+export interface AnalysisMeta {
+  platform: string;
+  game_name_lower: string;
+  tag_line_lower: string;
+  kind: "quick" | "deep";
+  algo_version: number | null;
+  latest_match_id: string | null;
+  analyzed_at: string | null;
+}
+
+export async function listAnalysesMeta(): Promise<AnalysisMeta[]> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT platform, game_name_lower, tag_line_lower, kind,
+           algo_version, latest_match_id, analyzed_at
+    FROM analyses`;
+  return rows as unknown as AnalysisMeta[];
+}
+
+export interface QuickAnalysisPage {
+  platform: string;
+  game_name: string;
+  tag_line: string;
+  analyzed_at: string | null;
+}
+
+export async function listQuickAnalysisPages(): Promise<QuickAnalysisPage[]> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT platform, game_name, tag_line, analyzed_at
+    FROM analyses WHERE kind = 'quick'`;
+  return rows as unknown as QuickAnalysisPage[];
+}
+
+// ── 최근 검색 ───────────────────────────────────────────
+
+export interface RecentSearchInput {
+  platform: PlatformRegion;
+  gameName: string;
+  tagLine: string;
+  currentLabel: string | null;
+  currentTier: string | null;
+  estimatedLabel: string | null;
+  estimatedTier: string | null;
+  estimatedPoints: number | null;
+}
+
+export async function upsertRecentSearch(r: RecentSearchInput): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO recent_searches
+      (platform, game_name_lower, tag_line_lower, game_name, tag_line,
+       current_label, current_tier, estimated_label, estimated_tier, estimated_points, searched_at)
+    VALUES (${r.platform}, ${r.gameName.toLowerCase()}, ${r.tagLine.toLowerCase()},
+            ${r.gameName}, ${r.tagLine}, ${r.currentLabel}, ${r.currentTier},
+            ${r.estimatedLabel}, ${r.estimatedTier}, ${r.estimatedPoints}, now())
+    ON CONFLICT (platform, game_name_lower, tag_line_lower) DO UPDATE
+    SET game_name = EXCLUDED.game_name, tag_line = EXCLUDED.tag_line,
+        current_label = EXCLUDED.current_label, current_tier = EXCLUDED.current_tier,
+        estimated_label = EXCLUDED.estimated_label, estimated_tier = EXCLUDED.estimated_tier,
+        estimated_points = EXCLUDED.estimated_points, searched_at = now()`;
+}
+
+export interface RecentSearchRow {
+  platform: PlatformRegion;
+  game_name: string;
+  tag_line: string;
+  current_label: string | null;
+  current_tier: string | null;
+  estimated_label: string | null;
+  estimated_tier: string | null;
+  estimated_points: number | null;
+  searched_at: string;
+}
+
+export async function listRecentSearches(
+  limit: number,
+): Promise<RecentSearchRow[]> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT platform, game_name, tag_line, current_label, current_tier,
+           estimated_label, estimated_tier, estimated_points, searched_at
+    FROM recent_searches ORDER BY searched_at DESC LIMIT ${limit}`;
+  return rows as unknown as RecentSearchRow[];
+}
+
+// ── 어드민 ──────────────────────────────────────────────
+
+export async function adminFindUser(
+  username: string,
+): Promise<{ salt: string; hash: string } | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT salt, hash FROM admin_users WHERE username = ${username}`;
+  return (rows[0] as { salt: string; hash: string } | undefined) ?? null;
+}
+
+export async function adminInsertSession(
+  token: string,
+  ttlSeconds: number,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO admin_sessions (token, expires_at)
+    VALUES (${token}, now() + ${`${ttlSeconds} seconds`}::interval)`;
+}
+
+export async function adminSessionValid(token: string): Promise<boolean> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT 1 FROM admin_sessions WHERE token = ${token} AND expires_at > now()`;
+  return rows.length > 0;
+}
+
+export async function adminExpireSession(token: string): Promise<void> {
+  const sql = await getSql();
+  await sql`UPDATE admin_sessions SET expires_at = now() WHERE token = ${token}`;
+}

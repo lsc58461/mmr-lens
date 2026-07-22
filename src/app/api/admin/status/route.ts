@@ -3,6 +3,7 @@ import { ADMIN_COOKIE, isValidAdminSession } from "@/lib/admin";
 import { cache } from "@/lib/cache";
 import { ALGO_VERSION } from "@/lib/mmr/estimate";
 import { getRecentSearches } from "@/lib/recent";
+import { listAnalysesMeta } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
       lastSeenAgoSec: Math.round((now - e.at) / 1000),
     }));
 
-  // 기록된 소환사 전체(최근 검색 기준) + 분석 캐시 보유·스테일 상태.
+  // 기록된 소환사 전체(최근 검색 기준) + 분석 보유·스테일 상태.
   // 스테일 판정은 저장 데이터 간 비교(정밀 vs 빠른의 매치 기준, 알고리즘 버전)로,
   // 라이엇 API 호출 없이 계산한다 — 실제 새 경기 여부까지는 알 수 없음.
   interface StoredMeta {
@@ -63,16 +64,18 @@ export async function GET(req: NextRequest) {
     algoVersion?: number;
     analyzedAt?: number;
   }
-  const [quickEntries, deepEntries] = await Promise.all([
-    cache.entries<StoredMeta>("quick:"),
-    cache.entries<StoredMeta>("deep:"),
-  ]);
-  const quickMap = new Map(
-    quickEntries.map((e) => [e.key.slice("quick:".length), e.value]),
-  );
-  const deepMap = new Map(
-    deepEntries.map((e) => [e.key.slice("deep:".length), e.value]),
-  );
+  const metas = await listAnalysesMeta();
+  const quickMap = new Map<string, StoredMeta>();
+  const deepMap = new Map<string, StoredMeta>();
+  for (const m of metas) {
+    const id = `${m.platform}:${m.game_name_lower}#${m.tag_line_lower}`;
+    const meta: StoredMeta = {
+      latestMatchId: m.latest_match_id,
+      algoVersion: m.algo_version ?? undefined,
+      analyzedAt: m.analyzed_at ? new Date(m.analyzed_at).getTime() : undefined,
+    };
+    (m.kind === "deep" ? deepMap : quickMap).set(id, meta);
+  }
 
   const summoners = recent.map((r) => {
     const id = `${r.region}:${r.gameName.toLowerCase()}#${r.tagLine.toLowerCase()}`;

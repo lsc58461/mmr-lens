@@ -50,23 +50,9 @@ class PostgresStore implements CacheStore {
     sql: import("postgres").Sql;
   }>;
 
-  constructor(url: string) {
-    this.db = (async () => {
-      const postgres = (await import("postgres")).default;
-      const sql = postgres(url, {
-        max: 3,
-        prepare: false,
-        // CREATE TABLE IF NOT EXISTS의 "already exists" NOTICE 로그 억제
-        onnotice: () => {},
-      });
-      await sql`
-        CREATE TABLE IF NOT EXISTS cache_entries (
-          key text PRIMARY KEY,
-          value jsonb NOT NULL,
-          expires_at timestamptz NOT NULL
-        )`;
-      return { sql };
-    })();
+  constructor() {
+    // 스키마 초기화 포함 공유 커넥션 (db.ts)
+    this.db = import("./db").then(async (m) => ({ sql: await m.getSql() }));
   }
 
   async get<T>(key: string): Promise<T | null> {
@@ -108,7 +94,7 @@ const globalForCache = globalThis as unknown as { __mmrCache?: CacheStore };
 export const cache: CacheStore =
   globalForCache.__mmrCache ??
   (globalForCache.__mmrCache = process.env.DATABASE_URL
-    ? new PostgresStore(process.env.DATABASE_URL)
+    ? new PostgresStore()
     : new MemoryStore());
 
 /** 캐시에 있으면 반환, 없으면 fn 실행 후 저장 */

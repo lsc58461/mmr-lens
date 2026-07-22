@@ -1,32 +1,24 @@
 import type { MetadataRoute } from "next";
-import { cache } from "@/lib/cache";
+import { listQuickAnalysisPages } from "@/lib/store";
 
 const BASE = "https://mmr-lens.kro.kr";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // DB에 보관 중(30일)인 분석된 소환사 전체를 색인 대상에 포함 —
-  // "닉네임 MMR" 롱테일 검색 유입용. 키 형식: quick:{region}:{이름#태그}
+  // 분석된 소환사 전체(analyses 테이블)를 색인 대상에 포함 —
+  // "닉네임 MMR" 롱테일 검색 유입용
   let summonerPages: MetadataRoute.Sitemap = [];
   try {
-    const entries = await cache.entries<{ analyzedAt?: number }>("quick:");
-    summonerPages = entries.flatMap((e) => {
-      const m = e.key.match(/^quick:([^:]+):(.+)$/);
-      if (!m || !m[2].includes("#")) return [];
-      return [
-        {
-          url: `${BASE}/summoner/${m[1]}/${encodeURIComponent(m[2])}`,
-          lastModified: e.value.analyzedAt
-            ? new Date(e.value.analyzedAt)
-            : undefined,
-          changeFrequency: "daily" as const,
-          priority: 0.7,
-        },
-      ];
-    });
+    const pages = await listQuickAnalysisPages();
+    summonerPages = pages.map((p) => ({
+      url: `${BASE}/summoner/${p.platform}/${encodeURIComponent(`${p.game_name}#${p.tag_line}`)}`,
+      lastModified: p.analyzed_at ? new Date(p.analyzed_at) : undefined,
+      changeFrequency: "daily" as const,
+      priority: 0.7,
+    }));
   } catch {
-    // 캐시 조회 실패 시 정적 페이지만이라도 반환
+    // DB 조회 실패 시 정적 페이지만이라도 반환
   }
 
   return [

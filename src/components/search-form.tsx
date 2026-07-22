@@ -17,7 +17,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = query.trim();
+    const trimmed = query.trim().normalize("NFKC");
     const hashIndex = trimmed.lastIndexOf("#");
     if (hashIndex <= 0 || hashIndex === trimmed.length - 1) {
       toast.error("게임명#태그 형식으로 입력해 주세요 (예: Hide on bush#KR1)");

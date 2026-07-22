@@ -187,7 +187,8 @@ export default async function SummonerPage({
       />
     );
   }
-  const decoded = decodeURIComponent(riotId);
+  // NFKC 정규화 — 전각(ＫR1)/반각(KR1) 등이 다른 소환사로 취급되는 것 방지
+  const decoded = decodeURIComponent(riotId).normalize("NFKC");
   const hashIndex = decoded.lastIndexOf("#");
   if (hashIndex <= 0) {
     return (

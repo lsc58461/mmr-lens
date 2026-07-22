@@ -10,6 +10,7 @@
 
 import "server-only";
 import { cache } from "@/lib/cache";
+import { getAnalysis, saveAnalysis } from "@/lib/store";
 import { withLowPriority } from "@/lib/riot/limiter";
 import { getAccountByRiotId, getRankedMatchIds } from "@/lib/riot/client";
 import type { PlatformRegion } from "@/lib/riot/types";
@@ -22,9 +23,9 @@ import {
   type MmrEstimate,
 } from "./estimate";
 
-// 결과는 30일 보관한다 — 만료로 사라지는 대신 "이전 분석"으로 즉시 표시되고
-// 백그라운드 재분석이 갱신한다. 신선도(72h)는 아래 FRESH_MAX_AGE_MS로 판정.
-const RESULT_TTL = 60 * 60 * 24 * 30;
+// 결과는 analyses 테이블에 영구 보관(소환사·종류당 1행 upsert) —
+// "이전 분석"으로 즉시 표시되고 백그라운드 재분석이 갱신한다.
+// 신선도(72h)는 아래 FRESH_MAX_AGE_MS로 판정.
 const FRESH_MAX_AGE_MS = 72 * 60 * 60_000;
 const JOB_TTL = 60 * 15;
 const JOB_STALE_MS = 5 * 60_000; // 이 시간 동안 진행이 없으면 죽은 잡으로 간주
@@ -81,9 +82,7 @@ async function getFreshResult(
   tagLine: string,
   latestMatchId: string | null,
 ): Promise<MmrEstimate | null> {
-  const stored = await cache.get<MmrEstimate>(
-    resultKey(kind, platform, gameName, tagLine),
-  );
+  const stored = await getAnalysis(kind, platform, gameName, tagLine);
   if (
     !stored ||
     stored.latestMatchId !== latestMatchId ||
@@ -123,7 +122,7 @@ export function getStoredResult(
   gameName: string,
   tagLine: string,
 ): Promise<MmrEstimate | null> {
-  return cache.get<MmrEstimate>(resultKey(kind, platform, gameName, tagLine));
+  return getAnalysis(kind, platform, gameName, tagLine);
 }
 
 // 빠른 분석 실행 마커 — Vercel처럼 인스턴스가 여러 개일 때 같은 소환사의
@@ -182,7 +181,7 @@ export function runQuickAnalysis(
           }
         },
       );
-      await cache.set(key, result, RESULT_TTL);
+      await saveAnalysis("quick", platform, gameName, tagLine, result);
       return result;
     } finally {
       await cache.set(mk, null, 1).catch(() => {});
@@ -366,11 +365,7 @@ export async function runDeepAnalysis(
       },
       ),
     );
-    await cache.set(
-      resultKey("deep", platform, gameName, tagLine),
-      result,
-      RESULT_TTL,
-    );
+    await saveAnalysis("deep", platform, gameName, tagLine, result);
     await cache.set<DeepJob>(
       jk,
       { state: "done", progress: 1, updatedAt: Date.now() },

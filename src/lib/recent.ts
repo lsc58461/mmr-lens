@@ -1,15 +1,18 @@
-// 최근 검색 기록. 캐시 스토어의 "recent:list" 키에 배열로 보관한다.
-// (Supabase 연결 시 영구 보존, 인메모리면 서버 재시작 시 초기화)
+// 최근 검색 기록 — recent_searches 테이블(소환사당 1행 upsert).
 
 import "server-only";
-import { cache } from "@/lib/cache";
-import type { PlatformRegion } from "@/lib/riot/types";
+import {
+  listRecentSearches,
+  upsertRecentSearch,
+  type RecentSearchInput,
+} from "./store";
+import type { PlatformRegion } from "./riot/types";
 
 export interface RecentEntry {
   region: PlatformRegion;
   gameName: string;
   tagLine: string;
-  currentLabel: string | null; // "챌린저 1677LP" 등, 언랭이면 null
+  currentLabel: string | null;
   currentTier: string | null;
   estimatedLabel: string | null;
   estimatedTier: string | null;
@@ -17,28 +20,45 @@ export interface RecentEntry {
   searchedAt: number;
 }
 
-const KEY = "recent:list";
 const MAX_ENTRIES = 50;
-const TTL_SECONDS = 60 * 60 * 24 * 90;
 
 export async function getRecentSearches(): Promise<RecentEntry[]> {
-  return (await cache.get<RecentEntry[]>(KEY)) ?? [];
+  try {
+    const rows = await listRecentSearches(MAX_ENTRIES);
+    return rows.map((r) => ({
+      region: r.platform,
+      gameName: r.game_name,
+      tagLine: r.tag_line,
+      currentLabel: r.current_label,
+      currentTier: r.current_tier,
+      estimatedLabel: r.estimated_label,
+      estimatedTier: r.estimated_tier,
+      estimatedPoints: r.estimated_points,
+      searchedAt: new Date(r.searched_at).getTime(),
+    }));
+  } catch {
+    return [];
+  }
 }
 
-/** 같은 소환사는 최신 기록으로 갱신하고 맨 앞으로 올린다 */
-export async function recordSearch(entry: Omit<RecentEntry, "searchedAt">) {
+/** 같은 소환사는 최신 기록으로 갱신된다 */
+export async function recordSearch(
+  entry: Omit<RecentEntry, "searchedAt" | "region"> & {
+    region: PlatformRegion;
+  },
+): Promise<void> {
   try {
-    const list = await getRecentSearches();
-    const dedup = list.filter(
-      (e) =>
-        !(
-          e.region === entry.region &&
-          e.gameName.toLowerCase() === entry.gameName.toLowerCase() &&
-          e.tagLine.toLowerCase() === entry.tagLine.toLowerCase()
-        ),
-    );
-    dedup.unshift({ ...entry, searchedAt: Date.now() });
-    await cache.set(KEY, dedup.slice(0, MAX_ENTRIES), TTL_SECONDS);
+    const input: RecentSearchInput = {
+      platform: entry.region,
+      gameName: entry.gameName,
+      tagLine: entry.tagLine,
+      currentLabel: entry.currentLabel,
+      currentTier: entry.currentTier,
+      estimatedLabel: entry.estimatedLabel,
+      estimatedTier: entry.estimatedTier,
+      estimatedPoints: entry.estimatedPoints,
+    };
+    await upsertRecentSearch(input);
   } catch {
     // 기록 실패는 검색 결과 표시에 영향을 주지 않는다
   }

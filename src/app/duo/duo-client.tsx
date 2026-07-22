@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { SummonerAutocomplete } from "@/components/summoner-autocomplete";
 
 interface DuoResult {
   a: { name: string };
@@ -86,14 +86,14 @@ export function DuoClient() {
         <CardContent>
           <form onSubmit={analyze} className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input
+              <SummonerAutocomplete
                 value={a}
-                onChange={(e) => setA(e.target.value)}
+                onChange={setA}
                 placeholder="첫 번째 소환사 (게임명#태그)"
               />
-              <Input
+              <SummonerAutocomplete
                 value={b}
-                onChange={(e) => setB(e.target.value)}
+                onChange={setB}
                 placeholder="두 번째 소환사 (게임명#태그)"
               />
             </div>

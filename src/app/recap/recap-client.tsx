@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { SummonerAutocomplete } from "@/components/summoner-autocomplete";
 import { TIER_COLORS } from "@/lib/mmr/rank";
 
 interface Recap {
@@ -76,9 +76,9 @@ export function RecapClient() {
       <Card>
         <CardContent>
           <form onSubmit={load} className="flex gap-2">
-            <Input
+            <SummonerAutocomplete
               value={riotId}
-              onChange={(e) => setRiotId(e.target.value)}
+              onChange={setRiotId}
               placeholder="게임명#태그 (예: Hide on bush#KR1)"
             />
             <Button type="submit" disabled={loading} className="gap-1.5">

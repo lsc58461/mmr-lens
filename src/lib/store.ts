@@ -313,6 +313,31 @@ export async function listRecentSearches(
   return rows as unknown as RecentSearchRow[];
 }
 
+export interface SummonerSuggestion {
+  game_name: string;
+  tag_line: string;
+  current_label: string | null;
+  current_tier: string | null;
+}
+
+/** 소환사 자동완성 — 기록된 검색에서 부분 일치, 최근 검색 순 */
+export async function searchRecentSummoners(
+  platform: PlatformRegion,
+  query: string,
+  limit = 8,
+): Promise<SummonerSuggestion[]> {
+  const sql = await getSql();
+  const q = `%${query.toLowerCase()}%`;
+  const rows = await sql`
+    SELECT game_name, tag_line, current_label, current_tier
+    FROM recent_searches
+    WHERE platform = ${platform}
+      AND (game_name_lower LIKE ${q}
+           OR game_name_lower || '#' || tag_line_lower LIKE ${q})
+    ORDER BY searched_at DESC LIMIT ${limit}`;
+  return rows as unknown as SummonerSuggestion[];
+}
+
 /** 최근 30일 내 검색된 소환사인지 — 디스코드 알림 대상 필터 */
 export async function isRecentlySearched(
   platform: PlatformRegion,

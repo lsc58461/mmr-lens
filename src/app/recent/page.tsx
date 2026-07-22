@@ -6,7 +6,8 @@ import { getRecentSearches } from "@/lib/recent";
 import { TIER_COLORS } from "@/lib/mmr/rank";
 import { PLATFORM_LABELS } from "@/lib/riot/types";
 
-export const dynamic = "force-dynamic";
+// 30초 ISR — 캐시된 페이지를 즉시 서빙하고 백그라운드에서 재생성
+export const revalidate = 30;
 
 export const metadata = {
   title: "최근 검색",

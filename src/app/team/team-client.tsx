@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Loader2, Shuffle, Swords, Users } from "lucide-react";
+import { Copy, Loader2, Plus, Shuffle, Swords, Users, X } from "lucide-react";
 import { toast } from "sonner";
+import { SummonerAutocomplete } from "@/components/summoner-autocomplete";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,7 +59,7 @@ function partitions(players: Player[]): { a: number[]; b: number[]; diff: number
 }
 
 export function TeamClient() {
-  const [input, setInput] = useState("");
+  const [names, setNames] = useState<string[]>(["", ""]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
   const [comboIndex, setComboIndex] = useState(0);
@@ -67,21 +68,28 @@ export function TeamClient() {
   const combos = useMemo(() => partitions(valid), [valid]);
   const current = combos[comboIndex % Math.max(combos.length, 1)];
 
+  function setName(i: number, v: string) {
+    setNames((arr) => arr.map((n, idx) => (idx === i ? v : n)));
+  }
+  function addRow() {
+    setNames((arr) => (arr.length >= 10 ? arr : [...arr, ""]));
+  }
+  function removeRow(i: number) {
+    setNames((arr) => (arr.length <= 2 ? arr : arr.filter((_, idx) => idx !== i)));
+  }
+
   async function resolve() {
-    const names = input
-      .split(/\n|,/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (names.length < 2) {
-      toast.error("2명 이상 입력해 주세요 (한 줄에 한 명, 게임명#태그)");
+    const list = names.map((s) => s.trim()).filter(Boolean);
+    if (list.length < 2) {
+      toast.error("2명 이상 입력해 주세요 (게임명#태그)");
       return;
     }
-    if (names.length > 10) {
-      toast.error("최대 10명까지 가능해요");
-      return;
-    }
-    if (names.length % 2 !== 0) {
+    if (list.length % 2 !== 0) {
       toast.error("짝수 인원만 팀을 나눌 수 있어요");
+      return;
+    }
+    if (new Set(list.map((s) => s.toLowerCase())).size !== list.length) {
+      toast.error("중복된 소환사가 있어요");
       return;
     }
     setLoading(true);
@@ -90,7 +98,7 @@ export function TeamClient() {
       const res = await fetch("/api/team/resolve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ region: "kr", names }),
+        body: JSON.stringify({ region: "kr", names: list }),
       });
       if (!res.ok) throw new Error();
       const data: { players: Player[] } = await res.json();
@@ -163,26 +171,55 @@ export function TeamClient() {
             참가자 입력
           </CardTitle>
           <CardDescription>
-            한 줄에 한 명씩 게임명#태그 입력 (2·4·6·8·10명) · 실력 점수는 저장된
-            추정 MMR → 현재 랭크 순으로 사용해요
+            게임명#태그로 입력 (2·4·6·8·10명) · 실력 점수는 저장된 추정 MMR →
+            현재 랭크 순으로 사용해요
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            rows={6}
-            placeholder={"Hide on bush#KR1\n괴물쥐#KR1\n..."}
-            className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          />
-          <Button onClick={resolve} disabled={loading} className="gap-1.5">
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Swords className="size-4" />
-            )}
-            팀 나누기
-          </Button>
+          <div className="space-y-2">
+            {names.map((n, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="w-6 shrink-0 text-center text-xs text-muted-foreground tabular-nums">
+                  {i + 1}
+                </span>
+                <SummonerAutocomplete
+                  value={n}
+                  onChange={(v) => setName(i, v)}
+                  placeholder={`참가자 ${i + 1} (게임명#태그)`}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeRow(i)}
+                  disabled={names.length <= 2}
+                  aria-label="참가자 제거"
+                  className="shrink-0"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addRow}
+              disabled={names.length >= 10}
+              className="gap-1.5"
+            >
+              <Plus className="size-3.5" />
+              인원 추가 ({names.length}/10)
+            </Button>
+            <Button size="sm" onClick={resolve} disabled={loading} className="gap-1.5">
+              {loading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Swords className="size-3.5" />
+              )}
+              팀 나누기
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

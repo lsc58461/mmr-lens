@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
+import { SummonerAutocomplete } from "@/components/summoner-autocomplete";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
 
@@ -42,9 +42,9 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         </Tabs>
       )}
       <div className="flex gap-2">
-        <Input
+        <SummonerAutocomplete
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={setQuery}
           placeholder="게임명#태그 (예: Hide on bush#KR1)"
           className={compact ? "h-9" : "h-11 text-base"}
         />

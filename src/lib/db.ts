@@ -116,6 +116,14 @@ async function initSchema(sql: Sql): Promise<void> {
       created_at timestamptz NOT NULL DEFAULT now(),
       expires_at timestamptz NOT NULL
     )`;
+
+  // 앱 설정 (디스코드 웹훅 등 — 어드민에서 관리)
+  await sql`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key text PRIMARY KEY,
+      value jsonb NOT NULL,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`;
 }
 
 async function createSql(): Promise<Sql> {

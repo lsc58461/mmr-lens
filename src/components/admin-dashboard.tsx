@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Activity,
+  Bell,
   Clock,
   Database,
   History,
@@ -114,12 +115,59 @@ export function AdminDashboard() {
   const [status, setStatus] = useState<Status | null>(null);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
 
+  // 디스코드 웹훅
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookSaving, setWebhookSaving] = useState(false);
+
   // 점검 설정
   const [mnt, setMnt] = useState<Maintenance | null>(null);
   const [reason, setReason] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/webhook")
+      .then((r) => r.json())
+      .then((d: { url?: string }) => setWebhookUrl(d.url ?? ""))
+      .catch(() => {});
+  }, []);
+
+  async function saveWebhook() {
+    setWebhookSaving(true);
+    try {
+      const res = await fetch("/api/admin/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: webhookUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success(webhookUrl ? "웹훅을 저장했어요" : "웹훅을 해제했어요");
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "저장 실패");
+    } finally {
+      setWebhookSaving(false);
+    }
+  }
+
+  async function testWebhook() {
+    setWebhookSaving(true);
+    try {
+      const res = await fetch("/api/admin/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("테스트 메시지를 보냈어요 — 디스코드 채널을 확인하세요");
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "발송 실패");
+    } finally {
+      setWebhookSaving(false);
+    }
+  }
 
   useEffect(() => {
     fetch("/api/maintenance")
@@ -390,6 +438,41 @@ export function AdminDashboard() {
                 점검 끄기
               </Button>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 디스코드 알림 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bell className="size-4 text-chart-2" />
+            디스코드 승급/강등 알림
+          </CardTitle>
+          <CardDescription>
+            기록된 소환사의 티어·디비전이 바뀌면 웹훅으로 알림을 보내요. 디스코드
+            채널 설정 → 연동 → 웹훅에서 URL을 만들어 붙여넣으세요.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+            placeholder="https://discord.com/api/webhooks/…"
+            type="url"
+          />
+          <div className="flex gap-2">
+            <Button size="sm" disabled={webhookSaving} onClick={saveWebhook}>
+              저장
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={webhookSaving || !webhookUrl}
+              onClick={testWebhook}
+            >
+              테스트 발송
+            </Button>
           </div>
         </CardContent>
       </Card>

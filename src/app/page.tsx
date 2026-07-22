@@ -1,4 +1,5 @@
-import { Activity, Gauge, Sparkles, Users } from "lucide-react";
+import { Activity, Gauge, Heart, Sparkles, Swords, Users } from "lucide-react";
+import Link from "next/link";
 import { SearchForm } from "@/components/search-form";
 import { Badge } from "@/components/ui/badge";
 
@@ -40,6 +41,27 @@ const JSON_LD = {
     "query-input": "required name=search_term_string",
   },
 };
+
+const TOOLS = [
+  {
+    icon: Swords,
+    title: "내전 팀 밸런서",
+    description: "추정 MMR로 가장 공평한 5:5 팀을 자동으로 나눠드려요.",
+    href: "/team",
+  },
+  {
+    icon: Heart,
+    title: "듀오 궁합 분석",
+    description: "둘이 같이 하면 이기는 조합인지 최근 경기로 확인해요.",
+    href: "/duo",
+  },
+  {
+    icon: Sparkles,
+    title: "시즌 결산",
+    description: "시즌 판수·승률·최다 챔피언을 카드 한 장으로.",
+    href: "/recap",
+  },
+] as const;
 
 export default function Home() {
   return (
@@ -89,6 +111,30 @@ export default function Home() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* 도구 */}
+      <div className="w-full space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-700 delay-500 fill-mode-backwards">
+        <h2 className="text-center text-sm font-semibold text-muted-foreground">
+          함께 쓰는 도구
+        </h2>
+        <div className="grid w-full gap-4 sm:grid-cols-3">
+          {TOOLS.map(({ icon: Icon, title, description, href }) => (
+            <Link
+              key={href}
+              href={href}
+              className="group rounded-xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-chart-2/50 hover:shadow-md hover:shadow-chart-2/5"
+            >
+              <span className="mb-3 flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-colors group-hover:bg-chart-2 group-hover:text-white">
+                <Icon className="size-4.5" />
+              </span>
+              <h3 className="mb-1.5 text-sm font-semibold">{title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -156,6 +156,21 @@ export interface LeagueSnapRow {
   created_at: string;
 }
 
+/** 가장 최근 스냅샷 (신선도 무관) — 승급/강등 감지 비교용 */
+export async function latestLeagueSnapshotAny(
+  fp: string,
+  platform: PlatformRegion,
+  puuid: string,
+): Promise<LeagueSnapRow | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT solo_tier, solo_rank, solo_lp, solo_wins, solo_losses, created_at
+    FROM league_snapshots
+    WHERE fp = ${fp} AND platform = ${platform} AND puuid = ${puuid}
+    ORDER BY created_at DESC LIMIT 1`;
+  return (rows[0] as LeagueSnapRow | undefined) ?? null;
+}
+
 /** 특정 소환사의 랭크 스냅샷 히스토리 (오래된 순) — LP 득실 추적용 */
 export async function listLeagueSnapshots(
   fp: string,
@@ -296,6 +311,59 @@ export async function listRecentSearches(
            estimated_label, estimated_tier, estimated_points, searched_at
     FROM recent_searches ORDER BY searched_at DESC LIMIT ${limit}`;
   return rows as unknown as RecentSearchRow[];
+}
+
+/** 최근 30일 내 검색된 소환사인지 — 디스코드 알림 대상 필터 */
+export async function isRecentlySearched(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<boolean> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT 1 FROM recent_searches
+    WHERE platform = ${platform}
+      AND game_name_lower = ${gameName.toLowerCase()}
+      AND tag_line_lower = ${tagLine.toLowerCase()}
+      AND searched_at > now() - interval '30 days'`;
+  return rows.length > 0;
+}
+
+/** 특정 소환사가 참가한 저장된 매치들 (결산·궁합용, API 호출 없음) */
+export async function listMatchesForPuuid(
+  fp: string,
+  puuid: string,
+  limit = 500,
+): Promise<MatchInfo[]> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT match_id, game_creation, game_duration, queue_id, participants
+    FROM matches
+    WHERE fp = ${fp} AND participants @> ${sql.json([{ puuid }] as never)}
+    ORDER BY game_creation DESC LIMIT ${limit}`;
+  return rows.map((r) => ({
+    matchId: r.match_id as string,
+    gameCreation: Number(r.game_creation),
+    gameDuration: r.game_duration as number,
+    queueId: r.queue_id as number,
+    participants: r.participants as MatchInfo["participants"],
+  }));
+}
+
+// ── 앱 설정 ─────────────────────────────────────────────
+
+export async function getSetting<T>(key: string): Promise<T | null> {
+  const sql = await getSql();
+  const rows = await sql`SELECT value FROM app_settings WHERE key = ${key}`;
+  return (rows[0]?.value as T | undefined) ?? null;
+}
+
+export async function setSetting<T>(key: string, value: T): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO app_settings (key, value)
+    VALUES (${key}, ${sql.json(value as never)})
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
 }
 
 // ── 어드민 ──────────────────────────────────────────────

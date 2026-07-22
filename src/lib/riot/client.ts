@@ -8,6 +8,7 @@ import {
   getMatchRow,
   insertLeagueSnapshot,
   latestLeagueSnapshot,
+  latestLeagueSnapshotAny,
   listLeagueSnapshots,
   saveMatchRow,
   updateSummonerProfile,
@@ -159,8 +160,47 @@ export async function getLeagueEntries(
   const entries = await riotFetch<LeagueEntry[]>(
     `https://${platform}.api.riotgames.com/lol/league/v4/entries/by-puuid/${puuid}`,
   );
+  // 승급/강등 감지(디스코드 알림)를 위해 이전 스냅샷과 비교 후 적재
+  const prev = await latestLeagueSnapshotAny(keyFp(), platform, puuid).catch(
+    () => null,
+  );
   await insertLeagueSnapshot(keyFp(), platform, puuid, entries).catch(() => {});
+  if (prev?.solo_tier && prev.solo_rank !== null && prev.solo_lp !== null) {
+    void import("@/lib/notify").then((m) =>
+      m
+        .notifyRankChangeIfNeeded(
+          keyFp(),
+          platform,
+          puuid,
+          { tier: prev.solo_tier!, rank: prev.solo_rank!, lp: prev.solo_lp! },
+          entries,
+        )
+        .catch(() => {}),
+    );
+  }
   return entries;
+}
+
+/** 현재 API 키 지문 — puuid 스코프 데이터 조회 시 사용 */
+export function riotKeyFp(): string {
+  return keyFp();
+}
+
+/** 시즌 랭크 총 판수 — 매치 ID 페이징으로 센다 (100판당 1콜, 상한 500) */
+export async function riotCountRankedMatches(
+  platform: PlatformRegion,
+  puuid: string,
+): Promise<{ total: number; capped: boolean }> {
+  const routing = PLATFORM_TO_ROUTING[platform];
+  let total = 0;
+  for (let start = 0; start < 500; start += 100) {
+    const ids = await riotFetch<string[]>(
+      `https://${routing}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?queue=420&type=ranked&start=${start}&count=100`,
+    );
+    total += ids.length;
+    if (ids.length < 100) return { total, capped: false };
+  }
+  return { total, capped: true };
 }
 
 /** 랭크 스냅샷 히스토리 — LP 득실 추적용 (API 호출 없음, DB만 조회) */

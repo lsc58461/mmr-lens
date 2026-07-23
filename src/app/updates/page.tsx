@@ -20,8 +20,26 @@ const CHANGELOG: {
   items: { tag: Tag; text: string }[];
 }[] = [
   {
+    date: "2026-07-24",
+    title: "디스코드 봇",
+    items: [
+      {
+        tag: "신규",
+        text: "디스코드 봇 — /mmr 로 서버에서 바로 조회, /mmr-team·/mmr-duo·/mmr-recent 지원",
+      },
+      {
+        tag: "신규",
+        text: "/mmr-verify 로 계정 인증 — 디스코드에서 명령어 한 줄이면 알림 대상 등록",
+      },
+      {
+        tag: "개선",
+        text: "알림 발송이 MMR Lens 봇으로 통일됐어요",
+      },
+    ],
+  },
+  {
     date: "2026-07-22",
-    title: "디스코드 봇과 새 도구 3종",
+    title: "새 도구 3종과 디스코드 알림",
     items: [
       {
         tag: "신규",
@@ -31,15 +49,7 @@ const CHANGELOG: {
       { tag: "신규", text: "시즌 결산 — 판수·승률·최다 챔피언 카드" },
       {
         tag: "신규",
-        text: "디스코드 봇 — /mmr 로 서버에서 바로 조회, /mmr-team·/mmr-duo·/mmr-recent 지원",
-      },
-      {
-        tag: "신규",
-        text: "/mmr-verify 로 계정 인증 (또는 사이트 소환사 인증) — 인증하면 알림 대상이 돼요",
-      },
-      {
-        tag: "신규",
-        text: "디스코드 알림 — 승급/강등은 물론 5·10연승, 시즌 최고 티어 달성까지 카드로 발송",
+        text: "소환사 인증 — 인증하면 승급/강등, 5·10연승, 시즌 최고 티어 달성 시 디스코드 알림을 받아요",
       },
       { tag: "신규", text: "소환사 입력 자동완성 (기록 기반)" },
     ],

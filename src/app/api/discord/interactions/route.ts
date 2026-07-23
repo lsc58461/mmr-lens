@@ -297,16 +297,16 @@ export async function POST(req: NextRequest) {
         case "mmr":
           await handleMmr(token, get("소환사"));
           break;
-        case "team":
+        case "mmr-team":
           await handleTeam(token, get("참가자"));
           break;
-        case "verify":
+        case "mmr-verify":
           await handleVerify(token, get("소환사"), discordId, discordName);
           break;
-        case "duo":
+        case "mmr-duo":
           await handleDuo(token, get("소환사1"), get("소환사2"));
           break;
-        case "recent":
+        case "mmr-recent":
           await handleRecent(token);
           break;
         default:

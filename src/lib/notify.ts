@@ -13,12 +13,38 @@ import {
 } from "./store";
 import type { PlatformRegion } from "./riot/types";
 
-export const WEBHOOK_SETTING_KEY = "discord-webhook";
+export const CHANNEL_SETTING_KEY = "discord-channel";
 const STREAK_MILESTONE = 5; // 5연승 단위로 알림 (5·10·15…)
 
-export async function getWebhookUrl(): Promise<string | null> {
-  const stored = await getSetting<string>(WEBHOOK_SETTING_KEY).catch(() => null);
-  return stored || process.env.DISCORD_WEBHOOK_URL || null;
+export async function getNotifyChannelId(): Promise<string | null> {
+  return getSetting<string>(CHANNEL_SETTING_KEY).catch(() => null);
+}
+
+export interface DiscordPayload {
+  content?: string;
+  embeds?: Embed[];
+}
+
+/** 알림 전송 — MMR Lens 봇이 지정된 채널로 발송한다 */
+export async function sendNotification(
+  payload: DiscordPayload,
+): Promise<boolean> {
+  const channelId = await getNotifyChannelId();
+  const botToken = process.env.DISCORD_BOT_TOKEN;
+  if (!channelId || !botToken) return false;
+  const res = await fetch(
+    `https://discord.com/api/v10/channels/${channelId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bot ${botToken}`,
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(8_000),
+    },
+  ).catch(() => null);
+  return Boolean(res?.ok);
 }
 
 export interface SoloRank {
@@ -48,33 +74,26 @@ function labelFromState(tier: string, rank: string, points: number): string {
 }
 
 interface Embed {
-  title: string;
-  description: string;
-  color: number;
+  title?: string;
+  description?: string;
+  color?: number;
+  url?: string;
+  image?: { url: string };
+  footer?: { text: string };
 }
 
-async function send(
-  webhook: string,
-  e: Embed,
-  url: string,
-  image: string,
-): Promise<void> {
-  await fetch(webhook, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      embeds: [
-        {
-          title: e.title,
-          description: e.description,
-          url,
-          color: e.color,
-          image: { url: image },
-          footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
-        },
-      ],
-    }),
-    signal: AbortSignal.timeout(5_000),
+async function send(e: Embed, url: string, image: string): Promise<void> {
+  await sendNotification({
+    embeds: [
+      {
+        title: e.title,
+        description: e.description,
+        url,
+        color: e.color,
+        image: { url: image },
+        footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
+      },
+    ],
   }).catch(() => {});
 }
 
@@ -160,7 +179,5 @@ export async function checkMilestones(
   }).catch(() => {});
 
   if (events.length === 0) return;
-  const webhook = await getWebhookUrl();
-  if (!webhook) return;
-  for (const e of events) await send(webhook, e, url, image);
+  for (const e of events) await send(e, url, image);
 }

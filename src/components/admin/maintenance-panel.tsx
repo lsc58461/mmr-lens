@@ -1,0 +1,157 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+
+interface Maintenance {
+  active: boolean;
+  on: boolean;
+  reason: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+}
+
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function MaintenancePanel() {
+  const [mnt, setMnt] = useState<Maintenance | null>(null);
+  const [reason, setReason] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/maintenance")
+      .then((r) => r.json())
+      .then((d: Maintenance) => {
+        setMnt(d);
+        setReason(d.reason ?? "");
+        setStartsAt(isoToLocalInput(d.startsAt));
+        setEndsAt(isoToLocalInput(d.endsAt));
+      })
+      .catch(() => {});
+  }, []);
+
+  async function save(on: boolean) {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/maintenance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          on,
+          reason: reason || null,
+          startsAt: startsAt ? new Date(startsAt).toISOString() : null,
+          endsAt: endsAt ? new Date(endsAt).toISOString() : null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const data: Maintenance = await res.json();
+      setMnt(data);
+      toast.success(
+        data.on
+          ? data.active
+            ? "점검 모드가 켜졌어요 — 최대 10초 내 전체 적용"
+            : "점검이 예약됐어요 — 시작 시각에 자동 활성화"
+          : "점검 모드를 껐어요",
+      );
+    } catch {
+      toast.error("점검 설정 저장에 실패했어요");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const state = !mnt?.on
+    ? { label: "꺼짐", cls: "bg-muted text-muted-foreground" }
+    : mnt.active
+      ? { label: "점검 중", cls: "bg-destructive text-white" }
+      : { label: "예약됨", cls: "bg-chart-2 text-white" };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-lg font-bold tracking-tight">점검 모드</h1>
+        <p className="text-xs text-muted-foreground">
+          어드민·API는 점검 중에도 접속 가능해요
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            설정
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${state.cls}`}
+            >
+              {state.label}
+            </span>
+          </CardTitle>
+          <CardDescription>
+            사유·기간을 설정하고 켜면 방문자에게 점검 페이지가 표시돼요. 종료
+            시각이 지나면 자동으로 해제됩니다.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="점검 사유 (예: 서버 업그레이드 작업)"
+          />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-xs text-muted-foreground">
+              시작 (비우면 즉시)
+              <Input
+                type="datetime-local"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+              />
+            </label>
+            <label className="space-y-1 text-xs text-muted-foreground">
+              종료 (비우면 수동 해제까지)
+              <Input
+                type="datetime-local"
+                value={endsAt}
+                onChange={(e) => setEndsAt(e.target.value)}
+              />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={mnt?.on ? "secondary" : "destructive"}
+              disabled={saving}
+              onClick={() => save(true)}
+            >
+              {mnt?.on ? "설정 업데이트" : "점검 켜기"}
+            </Button>
+            {mnt?.on && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => save(false)}
+              >
+                점검 끄기
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

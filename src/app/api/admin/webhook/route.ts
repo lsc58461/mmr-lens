@@ -1,52 +1,64 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_COOKIE, isValidAdminSession } from "@/lib/admin";
-import { WEBHOOK_SETTING_KEY, getWebhookUrl } from "@/lib/notify";
+import {
+  CHANNEL_SETTING_KEY,
+  getNotifyChannelId,
+  sendNotification,
+} from "@/lib/notify";
 import { setSetting } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
+
+const SITE = "https://mmr-lens.kro.kr";
 
 export async function GET(req: NextRequest) {
   if (!(await isValidAdminSession(req.cookies.get(ADMIN_COOKIE)?.value))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  return NextResponse.json({ url: (await getWebhookUrl()) ?? "" });
+  return NextResponse.json({
+    channelId: (await getNotifyChannelId()) ?? "",
+    botReady: Boolean(process.env.DISCORD_BOT_TOKEN),
+  });
 }
 
-// 저장 { url } / 테스트 발송 { test: true }
+// 채널 저장 { channelId } / 테스트 발송 { test } / 카드 미리보기 { preview }
 export async function POST(req: NextRequest) {
   if (!(await isValidAdminSession(req.cookies.get(ADMIN_COOKIE)?.value))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  let body: { url?: string; test?: boolean; preview?: string };
+  let body: { channelId?: string; test?: boolean; preview?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid body" }, { status: 400 });
   }
 
-  if (body.test) {
-    const url = await getWebhookUrl();
-    if (!url) {
-      return NextResponse.json({ error: "웹훅이 설정되지 않았어요" }, { status: 400 });
+  if (body.channelId !== undefined) {
+    const ch = body.channelId.trim();
+    if (ch && !/^\d{5,25}$/.test(ch)) {
+      return NextResponse.json(
+        { error: "채널 ID는 숫자만 입력해 주세요" },
+        { status: 400 },
+      );
     }
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "✅ MMR Lens 웹훅 연결 테스트" }),
-      signal: AbortSignal.timeout(5_000),
-    }).catch(() => null);
-    if (!res || !res.ok) {
-      return NextResponse.json({ error: "발송 실패 — URL을 확인해 주세요" }, { status: 502 });
+    await setSetting(CHANNEL_SETTING_KEY, ch);
+    return NextResponse.json({ ok: true, channelId: ch });
+  }
+
+  if (body.test) {
+    const ok = await sendNotification({
+      content: "✅ MMR Lens 알림 연결 테스트",
+    });
+    if (!ok) {
+      return NextResponse.json(
+        { error: "발송 실패 — 채널 ID·봇 권한을 확인해 주세요" },
+        { status: 502 },
+      );
     }
     return NextResponse.json({ ok: true });
   }
 
-  // 특정 소환사 카드로 실제 알림 모양 미리보기 (상태는 건드리지 않음)
   if (body.preview) {
-    const url = await getWebhookUrl();
-    if (!url) {
-      return NextResponse.json({ error: "웹훅이 설정되지 않았어요" }, { status: 400 });
-    }
     const riotId = body.preview.trim().normalize("NFKC");
     const hash = riotId.lastIndexOf("#");
     if (hash <= 0) {
@@ -56,37 +68,28 @@ export async function POST(req: NextRequest) {
       );
     }
     const encoded = encodeURIComponent(riotId);
-    const image = `https://mmr-lens.kro.kr/api/share-image?region=kr&riotId=${encoded}&v=${Date.now()}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        embeds: [
-          {
-            title: `🎉 ${riotId} 님 승급! (미리보기)`,
-            description: "실제 승급/강등·연승·시즌최고 시 이렇게 발송돼요",
-            url: `https://mmr-lens.kro.kr/summoner/kr/${encoded}`,
-            color: 0x3b82f6,
-            image: { url: image },
-            footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
+    const ok = await sendNotification({
+      embeds: [
+        {
+          title: `🎉 ${riotId} 님 승급! (미리보기)`,
+          description: "실제 승급/강등·연승·시즌최고 시 이렇게 발송돼요",
+          url: `${SITE}/summoner/kr/${encoded}`,
+          color: 0x3b82f6,
+          image: {
+            url: `${SITE}/api/share-image?region=kr&riotId=${encoded}&v=${Date.now()}`,
           },
-        ],
-      }),
-      signal: AbortSignal.timeout(8_000),
-    }).catch(() => null);
-    if (!res || !res.ok) {
-      return NextResponse.json({ error: "발송 실패 — 계정·URL을 확인해 주세요" }, { status: 502 });
+          footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
+        },
+      ],
+    });
+    if (!ok) {
+      return NextResponse.json(
+        { error: "발송 실패 — 채널 ID·봇 권한을 확인해 주세요" },
+        { status: 502 },
+      );
     }
     return NextResponse.json({ ok: true });
   }
 
-  const url = (body.url ?? "").trim();
-  if (url && !/^https:\/\/(discord\.com|discordapp\.com)\/api\/webhooks\//.test(url)) {
-    return NextResponse.json(
-      { error: "디스코드 웹훅 URL 형식이 아니에요" },
-      { status: 400 },
-    );
-  }
-  await setSetting(WEBHOOK_SETTING_KEY, url);
-  return NextResponse.json({ ok: true, url });
+  return NextResponse.json({ error: "invalid request" }, { status: 400 });
 }

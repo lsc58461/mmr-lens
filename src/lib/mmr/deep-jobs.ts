@@ -332,8 +332,8 @@ export async function markDeepJobRunning(
 
 /**
  * 정밀 분석 본체. 진행률을 캐시에 기록하며 완료 시 결과를 저장한다.
- * allowNotify=true면 완료 후 디스코드 마일스톤 알림을 체크한다
- * (유저 트리거 정밀분석만 true, 새벽 크론은 false).
+ * allowNotify=true면 완료 후 디스코드 마일스톤 알림을 체크한다.
+ * (마지막 알림 상태와 비교하므로 유저·크론 어디서 감지하든 중복 발송은 없다)
  */
 export async function runDeepAnalysis(
   platform: PlatformRegion,

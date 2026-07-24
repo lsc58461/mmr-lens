@@ -82,8 +82,15 @@ interface Embed {
   footer?: { text: string };
 }
 
-async function send(e: Embed, url: string, image: string): Promise<void> {
+async function send(
+  e: Embed,
+  url: string,
+  image: string,
+  discordUserId: string | null,
+): Promise<void> {
   await sendNotification({
+    // 연동된 디스코드 계정을 멘션해 본인에게 핑이 가게 한다
+    content: discordUserId ? `<@${discordUserId}>` : undefined,
     embeds: [
       {
         title: e.title,
@@ -176,8 +183,9 @@ export async function checkMilestones(
     last_points: points,
     best_points: Math.max(state.best_points ?? 0, points),
     notified_streak: streak > 0 ? streak : 0,
+    discord_user_id: state.discord_user_id,
   }).catch(() => {});
 
   if (events.length === 0) return;
-  for (const e of events) await send(e, url, image);
+  for (const e of events) await send(e, url, image, state.discord_user_id);
 }

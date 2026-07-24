@@ -449,6 +449,7 @@ export interface VerifiedNotifyState {
   last_points: number | null;
   best_points: number | null;
   notified_streak: number;
+  discord_user_id: string | null;
 }
 
 /** 인증+활성 소환사의 알림 상태 조회 (미인증/비활성이면 null) */
@@ -459,7 +460,8 @@ export async function getVerifiedNotifyState(
 ): Promise<VerifiedNotifyState | null> {
   const sql = await getSql();
   const rows = await sql`
-    SELECT last_tier, last_rank, last_points, best_points, notified_streak
+    SELECT last_tier, last_rank, last_points, best_points, notified_streak,
+           discord_user_id
     FROM verified_summoners
     WHERE platform = ${platform} AND active = true
       AND game_name_lower = ${gameName.toLowerCase()}

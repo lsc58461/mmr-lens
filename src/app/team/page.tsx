@@ -4,7 +4,7 @@ import { TeamClient } from "./team-client";
 export const metadata = {
   title: "내전 팀 밸런서",
   description:
-    "참가자들의 추정 MMR로 가장 공평한 5:5 팀을 자동으로 나눠주는 내전 도우미",
+    "참가자들의 매칭 실력대로 가장 공평한 5:5 팀을 자동으로 나눠주는 내전 도우미",
 };
 
 export default function TeamPage() {
@@ -19,7 +19,7 @@ export default function TeamPage() {
             내전 팀 밸런서
           </h1>
           <p className="text-sm text-muted-foreground">
-            추정 MMR 기준으로 가장 공평한 팀을 짜드려요
+            매칭 실력대 기준으로 가장 공평한 팀을 짜드려요
           </p>
         </div>
       </div>

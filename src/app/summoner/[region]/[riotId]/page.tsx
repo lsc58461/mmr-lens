@@ -70,8 +70,8 @@ export async function generateMetadata({
 }) {
   const { region, riotId } = await params;
   const decoded = decodeURIComponent(riotId);
-  const title = `${decoded} 숨겨진 MMR`;
-  const description = `${decoded}의 숨겨진 MMR — 최근 솔로랭크 경기 로비 랭크 역추적 기반 추정치를 확인해 보세요.`;
+  const title = `${decoded} 숨은 실력대`;
+  const description = `${decoded}의 숨은 실력대 — 최근 솔로랭크 경기 로비 랭크 역추적 기반 추정치를 확인해 보세요.`;
   const image = `/api/share-image?region=${region}&riotId=${encodeURIComponent(decoded)}`;
   return {
     title,
@@ -112,7 +112,7 @@ function gapVerdict(gap: number): {
     };
   if (gap <= -50)
     return { text: "티어보다 약간 낮은 매칭이에요.", tone: "down" };
-  return { text: "티어와 실제 MMR이 잘 맞아떨어져요.", tone: "flat" };
+  return { text: "티어와 실제 실력대가 잘 맞아떨어져요.", tone: "flat" };
 }
 
 function timeAgo(ts: number): string {
@@ -255,7 +255,7 @@ export default async function SummonerPage({
           return (
             <ErrorCard
               title="아직 분석된 적 없는 소환사예요"
-              description="사이트에서 검색하면 숨겨진 MMR 분석이 시작됩니다."
+              description="사이트에서 검색하면 숨은 실력대 분석이 시작됩니다."
             />
           );
         } else {
@@ -413,7 +413,7 @@ export default async function SummonerPage({
         </div>
       </div>
 
-      {/* 히어로: 추정 MMR 쇼케이스 + 현재 티어 */}
+      {/* 히어로: 매칭 실력대 쇼케이스 + 현재 티어 */}
       <div className="grid gap-4 lg:grid-cols-5 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-100 fill-mode-backwards">
         <Card
           className="relative overflow-hidden lg:col-span-3"
@@ -429,7 +429,7 @@ export default async function SummonerPage({
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0 space-y-1.5">
                 <CardDescription className="flex flex-wrap items-center gap-2">
-                  추정 MMR
+                  매칭 실력대
                   <Badge
                     variant="outline"
                     className="bg-background/60 font-normal"
@@ -534,7 +534,7 @@ export default async function SummonerPage({
             <CardTitle className="text-base">LP 흐름</CardTitle>
             <CardDescription>
               랭크 스냅샷 관측 {lpInsight.observedWins}승{" "}
-              {lpInsight.observedLosses}패 기준 · LP 득실은 내부 MMR을 가장
+              {lpInsight.observedLosses}패 기준 · LP 득실은 내부 지표를 가장
               직접 반영하는 신호예요
             </CardDescription>
           </CardHeader>
@@ -597,7 +597,7 @@ export default async function SummonerPage({
       {/* 추이 차트 */}
       <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300 fill-mode-backwards">
         <CardHeader>
-          <CardTitle className="text-base">경기별 MMR 추이</CardTitle>
+          <CardTitle className="text-base">경기별 실력대 추이</CardTitle>
           <CardDescription>
             분석에 사용된 최근 {analyzedCount}경기 기준
             {duoExcludedCount > 0 &&
@@ -654,7 +654,7 @@ export default async function SummonerPage({
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        * 라이엇은 MMR을 공개하지 않으므로 이 수치는 같은 경기에 배정된
+        * 라이엇은 실제 실력대(내부 MMR)를 공개하지 않으므로 이 수치는 같은 경기에 배정된
         플레이어들의 현재 랭크(로비별 최고/최저 제외 절사평균)와 승패 성과(Elo
         업데이트)를 결합한 추정치입니다. 표본이 적을수록 오차가 커질 수 있어요.
       </p>

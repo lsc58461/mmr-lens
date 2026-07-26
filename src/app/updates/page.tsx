@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 
 export const metadata = {
   title: "업데이트 내역",
-  description: "MMR Lens의 기능 추가와 개선 사항 기록",
+  description: "Rift Lens의 기능 추가와 개선 사항 기록",
 };
 
 type Tag = "신규" | "개선" | "수정";
@@ -33,7 +33,7 @@ const CHANGELOG: {
       },
       {
         tag: "개선",
-        text: "알림 발송이 MMR Lens 봇으로 통일됐어요",
+        text: "알림 발송이 Rift Lens 봇으로 통일됐어요",
       },
     ],
   },
@@ -43,7 +43,7 @@ const CHANGELOG: {
     items: [
       {
         tag: "신규",
-        text: "내전 팀 밸런서 — 추정 MMR로 가장 공평한 팀 자동 구성",
+        text: "내전 팀 밸런서 — 매칭 실력대로 가장 공평한 팀 자동 구성",
       },
       { tag: "신규", text: "듀오 궁합 분석 — 함께한 경기 승률·맞대결 기록" },
       { tag: "신규", text: "시즌 결산 — 판수·승률·최다 챔피언 카드" },
@@ -60,7 +60,7 @@ const CHANGELOG: {
     items: [
       {
         tag: "신규",
-        text: "LP 흐름 카드 — 승리당/패배당 평균 LP로 내부 MMR 신호를 교차 확인 (데이터가 쌓이면 표시)",
+        text: "LP 흐름 카드 — 승리당/패배당 평균 LP로 내부 실력 지표를 교차 확인 (데이터가 쌓이면 표시)",
       },
       { tag: "신규", text: "업데이트 내역·점검 안내 페이지" },
       {
@@ -120,14 +120,14 @@ const CHANGELOG: {
   },
   {
     date: "2026-07-19",
-    title: "MMR Lens 오픈",
+    title: "Rift Lens 오픈",
     items: [
       {
         tag: "신규",
-        text: "숨겨진 MMR 추정 — 최근 경기 로비의 랭크를 역추적해 계산",
+        text: "숨은 실력대 추정 — 최근 경기 로비의 랭크를 역추적해 계산",
       },
       { tag: "신규", text: "정밀 분석 — 20경기 × 전원 표본, 완료 시 자동 갱신" },
-      { tag: "신규", text: "경기별 MMR 추이 그래프" },
+      { tag: "신규", text: "경기별 실력대 추이 그래프" },
     ],
   },
 ];
@@ -144,7 +144,7 @@ export default function UpdatesPage() {
             업데이트 내역
           </h1>
           <p className="text-sm text-muted-foreground">
-            MMR Lens가 이렇게 좋아지고 있어요
+            Rift Lens가 이렇게 좋아지고 있어요
           </p>
         </div>
       </div>

@@ -28,8 +28,8 @@ export interface MmrChartPoint {
 }
 
 const chartConfig = {
-  lobby: { label: "로비 평균 MMR", color: "var(--chart-1)" },
-  est: { label: "추정 MMR", color: "var(--chart-2)" },
+  lobby: { label: "로비 평균 랭크", color: "var(--chart-1)" },
+  est: { label: "매칭 실력대", color: "var(--chart-2)" },
 } satisfies ChartConfig;
 
 export function MmrChart({

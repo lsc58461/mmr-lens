@@ -26,7 +26,7 @@ interface Player {
 }
 
 const SOURCE_LABELS = {
-  analysis: "추정 MMR",
+  analysis: "매칭 실력대",
   rank: "현재 랭크",
   unranked: "기본값",
 } as const;
@@ -122,7 +122,7 @@ export function TeamClient() {
     const sumB = current.b.reduce((s, i) => s + valid[i].points, 0);
     navigator.clipboard
       .writeText(
-        `[블루팀] 합계 ${sumA.toLocaleString()}pt\n${line(current.a)}\n\n[레드팀] 합계 ${sumB.toLocaleString()}pt\n${line(current.b)}\n\n전력차 ${current.diff.toLocaleString()}pt · MMR Lens 팀 밸런서`,
+        `[블루팀] 합계 ${sumA.toLocaleString()}pt\n${line(current.a)}\n\n[레드팀] 합계 ${sumB.toLocaleString()}pt\n${line(current.b)}\n\n전력차 ${current.diff.toLocaleString()}pt · Rift Lens 팀 밸런서`,
       )
       .then(() => toast.success("팀 구성을 복사했어요"))
       .catch(() => toast.error("복사에 실패했어요"));
@@ -172,7 +172,7 @@ export function TeamClient() {
             참가자 입력
           </CardTitle>
           <CardDescription>
-            게임명#태그로 입력 (2·4·6·8·10명) · 실력 점수는 저장된 추정 MMR →
+            게임명#태그로 입력 (2·4·6·8·10명) · 실력 점수는 저장된 매칭 실력대 →
             현재 랭크 순으로 사용해요
           </CardDescription>
         </CardHeader>

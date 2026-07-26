@@ -14,7 +14,7 @@ function gapText(gap: number | null): string {
   if (gap === null) return "";
   if (gap >= 50) return "티어보다 높은 실력대에서 매칭 중";
   if (gap <= -50) return "티어보다 낮은 실력대에서 매칭 중";
-  return "티어와 실제 MMR이 일치";
+  return "티어와 실제 실력대가 일치";
 }
 
 export async function GET(req: NextRequest) {
@@ -61,14 +61,14 @@ export async function GET(req: NextRequest) {
           }}
         >
           <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>
-            MMR <span style={{ color: "#3b82f6", marginLeft: 8 }}>Lens</span>
+            Rift <span style={{ color: "#3b82f6", marginLeft: 8 }}>Lens</span>
           </div>
           <div style={{ display: "flex", fontSize: 52, fontWeight: 700 }}>
             {gameName}
             <span style={{ color: "#71717b" }}>#{tagLine}</span>
           </div>
           <div style={{ display: "flex", fontSize: 28, color: "#a1a1aa" }}>
-            아직 분석되지 않은 소환사예요 — 검색하면 숨겨진 MMR 분석이
+            아직 분석되지 않은 소환사예요 — 검색하면 숨은 실력대 분석이
             시작됩니다
           </div>
           <div style={{ display: "flex", fontSize: 22, color: "#52525c" }}>
@@ -183,7 +183,7 @@ export async function GET(req: NextRequest) {
               />
             </div>
             <div style={{ display: "flex", fontSize: 30, fontWeight: 700 }}>
-              MMR{" "}
+              Rift{" "}
               <span style={{ color: "#3b82f6", marginLeft: 8 }}>Lens</span>
             </div>
           </div>
@@ -216,7 +216,7 @@ export async function GET(req: NextRequest) {
                 marginTop: 10,
               }}
             >
-              추정 MMR
+              매칭 실력대
             </div>
             <div
               style={{

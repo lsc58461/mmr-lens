@@ -52,7 +52,7 @@ export function NotificationsPanel() {
       <div>
         <h1 className="text-lg font-bold tracking-tight">디스코드 알림</h1>
         <p className="text-xs text-muted-foreground">
-          인증된 소환사의 승급/강등·연승·시즌최고 시 MMR Lens 봇이 알림을 보내요
+          인증된 소환사의 승급/강등·연승·시즌최고 시 Rift Lens 봇이 알림을 보내요
         </p>
       </div>
 

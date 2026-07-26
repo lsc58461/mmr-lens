@@ -11,7 +11,7 @@ export const revalidate = 30;
 
 export const metadata = {
   title: "최근 검색",
-  description: "MMR Lens에서 최근 조회된 소환사들의 티어와 추정 MMR 목록",
+  description: "Rift Lens에서 최근 조회된 소환사들의 티어와 매칭 실력대 목록",
 };
 
 function timeAgo(ts: number): string {
@@ -87,7 +87,7 @@ export default async function RecentPage() {
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground">
-                    추정 MMR
+                    매칭 실력대
                   </div>
                   <div
                     className="font-medium"

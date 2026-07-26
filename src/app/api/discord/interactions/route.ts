@@ -108,12 +108,12 @@ async function handleMmr(token: string, summoner: string): Promise<void> {
       content: "", // 분석 중 안내 문구 제거
       embeds: [
         {
-          title: `${name} 의 추정 MMR`,
+          title: `${name} 의 매칭 실력대`,
           description: `**${est}**\n현재 티어 ${cur} · 갭 ${gap}`,
           url: `${SITE}/summoner/${PLATFORM}/${encodeURIComponent(name)}`,
           color: BLUE,
           image: { url: cardImage(name) },
-          footer: { text: "MMR Lens" },
+          footer: { text: "Rift Lens" },
         },
       ],
     });
@@ -164,7 +164,7 @@ async function handleTeam(token: string, raw: string): Promise<void> {
         }`,
         color: BLUE,
         url: `${SITE}/team`,
-        footer: { text: "MMR Lens · 추정 MMR 기준" },
+        footer: { text: "Rift Lens · 매칭 실력대 기준" },
       },
     ],
   });
@@ -202,7 +202,7 @@ async function handleVerify(
           description: `**${name}** 계정이 연결됐어요.\n이제 승급/강등·연승·시즌최고 시 알림을 보내드려요.`,
           url: `${SITE}/summoner/${PLATFORM}/${encodeURIComponent(name)}`,
           color: BLUE,
-          footer: { text: "MMR Lens" },
+          footer: { text: "Rift Lens" },
         },
       ],
     });
@@ -241,7 +241,7 @@ async function handleDuo(
             : "최근 100경기 안에서 함께한 기록이 없어요",
         url: `${SITE}/duo`,
         color: rate !== null && rate >= 50 ? BLUE : RED,
-        footer: { text: "MMR Lens" },
+        footer: { text: "Rift Lens" },
       },
     ],
   });
@@ -262,7 +262,7 @@ async function handleRecent(token: string): Promise<void> {
             .join("\n") || "기록이 없어요",
         url: `${SITE}/recent`,
         color: BLUE,
-        footer: { text: "MMR Lens" },
+        footer: { text: "Rift Lens" },
       },
     ],
   });

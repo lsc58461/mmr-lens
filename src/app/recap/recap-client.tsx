@@ -179,7 +179,7 @@ export function RecapClient() {
             </CardContent>
           </Card>
           <p className="text-xs text-muted-foreground">
-            * 상세 통계는 MMR Lens가 분석하며 저장한 경기 기준이라, 검색·재분석이
+            * 상세 통계는 Rift Lens가 분석하며 저장한 경기 기준이라, 검색·재분석이
             반복될수록 더 정확해져요.
           </p>
         </>

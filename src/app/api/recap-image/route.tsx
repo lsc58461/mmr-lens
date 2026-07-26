@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
           }}
         >
           <div style={{ display: "flex", fontSize: 28, fontWeight: 700 }}>
-            MMR <span style={{ color: "#3b82f6", marginLeft: 6 }}>Lens</span>
+            Rift <span style={{ color: "#3b82f6", marginLeft: 6 }}>Lens</span>
             <span style={{ color: "#71717b", marginLeft: 14, fontWeight: 400 }}>
               시즌 결산
             </span>

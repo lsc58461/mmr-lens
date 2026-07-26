@@ -25,7 +25,7 @@ export interface DiscordPayload {
   embeds?: Embed[];
 }
 
-/** 알림 전송 — MMR Lens 봇이 지정된 채널로 발송한다 */
+/** 알림 전송 — Rift Lens 봇이 지정된 채널로 발송한다 */
 export async function sendNotification(
   payload: DiscordPayload,
 ): Promise<boolean> {
@@ -98,7 +98,7 @@ async function send(
         url,
         color: e.color,
         image: { url: image },
-        footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
+        footer: { text: "Rift Lens · 롤 숨은 실력대 판독" },
       },
     ],
   }).catch(() => {});

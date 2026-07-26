@@ -20,7 +20,7 @@ const UNRANKED_POINTS = 800; // 실버 4 상당 기본값
 
 /**
  * 각 플레이어의 실력 점수를 해석한다.
- * 우선순위: 저장된 추정 MMR(정밀>빠른, 신선도 무관) → 현재 랭크 → 언랭 기본값
+ * 우선순위: 저장된 매칭 실력대(정밀>빠른, 신선도 무관) → 현재 랭크 → 언랭 기본값
  */
 export async function resolvePlayers(
   platform: PlatformRegion,

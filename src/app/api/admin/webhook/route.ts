@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   if (body.test) {
     const ok = await sendNotification({
-      content: "✅ MMR Lens 알림 연결 테스트",
+      content: "✅ Rift Lens 알림 연결 테스트",
     });
     if (!ok) {
       return NextResponse.json(
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
           image: {
             url: `${SITE}/api/share-image?region=kr&riotId=${encoded}&v=${Date.now()}`,
           },
-          footer: { text: "MMR Lens · 추정 MMR로 보는 실력대" },
+          footer: { text: "Rift Lens · 롤 숨은 실력대 판독" },
         },
       ],
     });

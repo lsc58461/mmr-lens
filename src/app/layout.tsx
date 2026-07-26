@@ -20,29 +20,28 @@ const geistMono = Geist_Mono({
 });
 
 const DESCRIPTION =
-  "라이엇 공식 API 데이터로 리그 오브 레전드 솔로랭크의 숨겨진 MMR을 추정합니다. 최근 경기 로비의 랭크를 역추적해 내 진짜 실력 점수를 확인해 보세요.";
+  "라이엇 공식 API의 공개 랭크 데이터로 리그 오브 레전드 솔로랭크의 매칭 실력대를 추정합니다. 최근 경기 로비의 랭크를 역추적해 내가 어느 실력대에서 매칭되는지 확인해 보세요.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://mmr-lens.kro.kr"),
   title: {
-    default: "MMR Lens — 숨겨진 MMR 판독기",
-    template: "%s | MMR Lens",
+    default: "Rift Lens — 롤 매칭 실력대 판독기",
+    template: "%s | Rift Lens",
   },
   description: DESCRIPTION,
   keywords: [
-    "롤 MMR",
-    "MMR 측정",
-    "숨겨진 MMR",
-    "롤 MMR 확인",
-    "리그오브레전드 MMR",
-    "솔로랭크 MMR",
-    "MMR 조회",
+    "롤 매칭 실력대",
+    "롤 티어 분석",
+    "솔로랭크 실력 분석",
+    "롤 랭크 조회",
+    "리그오브레전드 실력대",
+    "롤 로비 평균 티어",
   ],
   openGraph: {
     type: "website",
     locale: "ko_KR",
-    siteName: "MMR Lens",
-    title: "MMR Lens — 숨겨진 MMR 판독기",
+    siteName: "Rift Lens",
+    title: "Rift Lens — 롤 매칭 실력대 판독기",
     description: DESCRIPTION,
     url: "/",
   },
@@ -78,7 +77,7 @@ export default function RootLayout({
               <Link href="/" className="group flex items-center gap-2">
                 <LogoMark className="size-7 shadow-sm transition-transform group-hover:scale-110" />
                 <span className="font-semibold tracking-tight">
-                  MMR <span className="text-primary">Lens</span>
+                  Rift <span className="text-primary">Lens</span>
                 </span>
               </Link>
               <div className="flex items-center gap-1">
@@ -114,7 +113,7 @@ export default function RootLayout({
                 자주 묻는 질문
               </Link>
             </div>
-            MMR Lens는 Riot Games의 공식 서비스가 아니며, 추정치는 참고용입니다.
+            Rift Lens는 Riot Games의 공식 서비스가 아니며, 추정치는 참고용입니다.
           </footer>
           <Toaster />
         </ThemeProvider>

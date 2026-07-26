@@ -58,7 +58,7 @@ export function ShareButton({
       // 1) 시스템 공유 시트
       if (navigator.canShare?.({ files: [file] })) {
         try {
-          await navigator.share({ files: [file], title: "MMR Lens" });
+          await navigator.share({ files: [file], title: "Rift Lens" });
           return;
         } catch (e) {
           // 사용자가 시트를 닫은 경우는 종료, 그 외(활성화 만료 등)는 다음 단계로

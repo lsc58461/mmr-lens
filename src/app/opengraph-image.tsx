@@ -2,7 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { ImageResponse } from "next/og";
 
-export const alt = "MMR Lens — 숨겨진 MMR 판독기";
+export const alt = "Rift Lens — 숨은 실력대 판독기";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -92,7 +92,7 @@ export default async function OgImage() {
             />
           </div>
           <div style={{ display: "flex", fontSize: 44, fontWeight: 700 }}>
-            MMR <span style={{ color: "#3b82f6", marginLeft: 10 }}>Lens</span>
+            Rift <span style={{ color: "#3b82f6", marginLeft: 10 }}>Lens</span>
           </div>
         </div>
 
@@ -105,7 +105,7 @@ export default async function OgImage() {
             textAlign: "center",
           }}
         >
-          내 진짜 MMR은 몇 점일까?
+          내 진짜 실력대는 어디쯤일까?
         </div>
         <div
           style={{
@@ -115,7 +115,7 @@ export default async function OgImage() {
             textAlign: "center",
           }}
         >
-          최근 경기 로비의 랭크를 역추적해 숨겨진 MMR을 추정해 드립니다
+          최근 경기 로비의 랭크를 역추적해 매칭 실력대를 추정해 드립니다
         </div>
 
         {/* 티어 엠블럼 행 */}

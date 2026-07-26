@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { listQuickAnalysisPages } from "@/lib/store";
 
-const BASE = "https://mmr-lens.kro.kr";
+const BASE = "https://rift-lens.xyz";
 
 export const dynamic = "force-dynamic";
 

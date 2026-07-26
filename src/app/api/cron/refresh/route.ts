@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
     const origin =
       req.nextUrl.hostname === "localhost"
         ? req.nextUrl.origin
-        : "https://mmr-lens.kro.kr";
+        : "https://rift-lens.xyz";
     const url = new URL("/api/cron/refresh", origin);
     const secret = process.env.CRON_SECRET;
     after(() =>

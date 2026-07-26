@@ -36,7 +36,7 @@ const JSON_LD = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "Rift Lens",
-  url: "https://mmr-lens.kro.kr",
+  url: "https://rift-lens.xyz",
   description:
     "리그 오브 레전드 솔로랭크의 매칭 실력대를 최근 경기 데이터로 추정하는 사이트",
   potentialAction: {
@@ -44,7 +44,7 @@ const JSON_LD = {
     target: {
       "@type": "EntryPoint",
       urlTemplate:
-        "https://mmr-lens.kro.kr/summoner/kr/{search_term_string}",
+        "https://rift-lens.xyz/summoner/kr/{search_term_string}",
     },
     "query-input": "required name=search_term_string",
   },

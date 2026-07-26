@@ -193,7 +193,7 @@ export async function GET(req: NextRequest) {
           <div style={{ display: "flex" }}>
             상세 통계는 분석된 {recap.analyzed}경기 기준
           </div>
-          <div style={{ display: "flex" }}>mmr-lens.kro.kr · Riot 비공식</div>
+          <div style={{ display: "flex" }}>rift-lens.xyz · Riot 비공식</div>
         </div>
       </div>
     ),

@@ -11,7 +11,7 @@ import type { PlatformRegion } from "@/lib/riot/types";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const SITE = "https://mmr-lens.kro.kr";
+const SITE = "https://rift-lens.xyz";
 const PLATFORM: PlatformRegion = "kr";
 const BLUE = 0x3b82f6;
 const RED = 0xef4444;

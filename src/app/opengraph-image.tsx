@@ -149,7 +149,7 @@ export default async function OgImage() {
             color: "#52525c",
           }}
         >
-          mmr-lens.kro.kr · Riot 비공식
+          rift-lens.xyz · Riot 비공식
         </div>
       </div>
     ),

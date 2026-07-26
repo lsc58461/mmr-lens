@@ -125,8 +125,8 @@ export async function checkMilestones(
   const points = rankToPoints(solo.tier, solo.rank, solo.lp);
   const name = `${gameName}#${tagLine}`;
   const encoded = encodeURIComponent(name);
-  const url = `https://mmr-lens.kro.kr/summoner/${platform}/${encoded}`;
-  const image = `https://mmr-lens.kro.kr/api/share-image?region=${platform}&riotId=${encoded}&v=${Date.now()}`;
+  const url = `https://rift-lens.xyz/summoner/${platform}/${encoded}`;
+  const image = `https://rift-lens.xyz/api/share-image?region=${platform}&riotId=${encoded}&v=${Date.now()}`;
 
   const events: Embed[] = [];
   const first = state.last_tier === null;

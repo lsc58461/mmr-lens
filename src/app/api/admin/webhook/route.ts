@@ -9,7 +9,7 @@ import { setSetting } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-const SITE = "https://mmr-lens.kro.kr";
+const SITE = "https://rift-lens.xyz";
 
 export async function GET(req: NextRequest) {
   if (!(await isValidAdminSession(req.cookies.get(ADMIN_COOKIE)?.value))) {

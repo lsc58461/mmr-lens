@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
             시작됩니다
           </div>
           <div style={{ display: "flex", fontSize: 22, color: "#52525c" }}>
-            mmr-lens.kro.kr
+            rift-lens.xyz
           </div>
         </div>
       ),

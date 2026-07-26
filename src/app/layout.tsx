@@ -23,7 +23,7 @@ const DESCRIPTION =
   "라이엇 공식 API의 공개 랭크 데이터로 리그 오브 레전드 솔로랭크의 매칭 실력대를 추정합니다. 최근 경기 로비의 랭크를 역추적해 내가 어느 실력대에서 매칭되는지 확인해 보세요.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://mmr-lens.kro.kr"),
+  metadataBase: new URL("https://rift-lens.xyz"),
   title: {
     default: "Rift Lens — 롤 매칭 실력대 판독기",
     template: "%s | Rift Lens",

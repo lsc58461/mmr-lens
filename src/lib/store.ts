@@ -110,7 +110,7 @@ export async function saveMatchRow(
     INSERT INTO matches (fp, match_id, platform, game_creation, game_duration, queue_id, participants)
     VALUES (${fp}, ${match.matchId}, ${platform}, ${match.gameCreation},
             ${match.gameDuration}, ${match.queueId}, ${sql.json(match.participants as never)})
-    ON CONFLICT (fp, match_id) DO NOTHING`;
+    ON CONFLICT (fp, match_id) DO UPDATE SET participants = EXCLUDED.participants`;
 }
 
 // ── 랭크 스냅샷 (히스토리 적재) ─────────────────────────

@@ -1,14 +1,19 @@
-// Data Dragon(라이엇 정적 에셋 CDN) 헬퍼. API 키 불필요.
+// Data Dragon(라이엇 정적 에셋 CDN) 서버 헬퍼. 순수 URL 함수는 ddragon-assets에서 re-export.
 
 import "server-only";
 import { cached } from "@/lib/cache";
+import { NAME_QUIRKS } from "./ddragon-assets";
+
+export {
+  championIconUrl,
+  championNameKo,
+  itemIconUrl,
+  profileIconUrl,
+  spellIconUrl,
+  tierEmblemUrl,
+} from "./ddragon-assets";
 
 const FALLBACK_VERSION = "15.1.1";
-
-// match-v5의 championName과 ddragon 파일명이 다른 예외들
-const NAME_QUIRKS: Record<string, string> = {
-  FiddleSticks: "Fiddlesticks",
-};
 
 export async function getDDragonVersion(): Promise<string> {
   try {
@@ -26,45 +31,28 @@ export async function getDDragonVersion(): Promise<string> {
   }
 }
 
-export function championIconUrl(version: string, championName: string): string {
-  const key = NAME_QUIRKS[championName] ?? championName;
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${key}.png`;
-}
-
-export function profileIconUrl(version: string, iconId: number): string {
-  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/${iconId}.png`;
-}
-
-/** 티어 엠블럼 — CommunityDragon 원본의 투명 여백을 잘라내 public/에 저장해둔 로컬 에셋 */
-export function tierEmblemUrl(tier: string): string {
-  return `/ranked-emblems/${tier.toLowerCase()}.png`;
-}
-
 /** 챔피언 영문 키 → 한글 이름 매핑 (예: MonkeyKing → 오공) */
 export async function getChampionNamesKo(
   version: string,
 ): Promise<Record<string, string>> {
   try {
-    return await cached(`ddragon:champnames:ko:${version}`, 60 * 60 * 24 * 7, async () => {
-      const res = await fetch(
-        `https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion.json`,
-        { cache: "no-store", signal: AbortSignal.timeout(8_000) },
-      );
-      if (!res.ok) throw new Error(`champion.json ${res.status}`);
-      const data: { data: Record<string, { id: string; name: string }> } =
-        await res.json();
-      const map: Record<string, string> = {};
-      for (const c of Object.values(data.data)) map[c.id] = c.name;
-      return map;
-    });
+    return await cached(
+      `ddragon:champnames:ko:${version}`,
+      60 * 60 * 24 * 7,
+      async () => {
+        const res = await fetch(
+          `https://ddragon.leagueoflegends.com/cdn/${version}/data/ko_KR/champion.json`,
+          { cache: "no-store", signal: AbortSignal.timeout(8_000) },
+        );
+        if (!res.ok) throw new Error(`champion.json ${res.status}`);
+        const data: { data: Record<string, { id: string; name: string }> } =
+          await res.json();
+        const map: Record<string, string> = {};
+        for (const c of Object.values(data.data)) map[c.id] = c.name;
+        return map;
+      },
+    );
   } catch {
     return {};
   }
-}
-
-export function championNameKo(
-  names: Record<string, string>,
-  championName: string,
-): string {
-  return names[NAME_QUIRKS[championName] ?? championName] ?? championName;
 }

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { DeepRefine } from "@/components/deep-refine";
 import { LobbyDistribution } from "@/components/lobby-distribution";
+import { MatchHistory } from "@/components/match-history";
 import { MatchList, type MatchRow } from "@/components/match-list";
 import { MmrChart, type MmrChartPoint } from "@/components/mmr-chart";
 import { SearchForm } from "@/components/search-form";
@@ -615,11 +616,16 @@ export default async function SummonerPage({
         </CardContent>
       </Card>
 
-      {/* 매치 리스트 */}
+      {/* 최근 전적 (전적검색) */}
+      <MatchHistory region={region} riotId={decoded} ddVersion={ddVersion} />
+
+      {/* 매치 리스트 (실력대 분석 근거) */}
       <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-[400ms] fill-mode-backwards">
         <CardHeader>
-          <CardTitle className="text-base">분석에 사용된 경기</CardTitle>
-          <CardDescription>최근 솔로랭크 {matches.length}경기</CardDescription>
+          <CardTitle className="text-base">실력대 분석에 사용된 경기</CardTitle>
+          <CardDescription>
+            로비 평균 랭크 기준 · 최근 {matches.length}경기
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {matches.length === 0 ? (

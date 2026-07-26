@@ -219,18 +219,46 @@ export async function getMatch(
   matchId: string,
 ): Promise<MatchInfo> {
   const row = await getMatchRow(keyFp(), matchId);
-  if (row) return row;
+  // 확장 필드(cs)가 있으면 저장분 사용, 없으면(구버전 저장) 재조회해 채운다
+  if (row && row.participants[0]?.cs !== undefined) return row;
 
   const routing = PLATFORM_TO_ROUTING[platform];
+  interface RawParticipant {
+    puuid: string;
+    riotIdGameName: string;
+    riotIdTagline: string;
+    teamId: number;
+    win: boolean;
+    championName: string;
+    kills: number;
+    deaths: number;
+    assists: number;
+    teamPosition: string;
+    champLevel: number;
+    totalMinionsKilled: number;
+    neutralMinionsKilled: number;
+    goldEarned: number;
+    totalDamageDealtToChampions: number;
+    visionScore: number;
+    summoner1Id: number;
+    summoner2Id: number;
+    item0: number;
+    item1: number;
+    item2: number;
+    item3: number;
+    item4: number;
+    item5: number;
+    item6: number;
+  }
   const raw = await riotFetch<{
     info: {
       gameCreation: number;
       gameDuration: number;
       queueId: number;
-      participants: MatchInfo["participants"];
+      participants: RawParticipant[];
     };
   }>(`https://${routing}.api.riotgames.com/lol/match/v5/matches/${matchId}`);
-  // 저장 용량을 아끼기 위해 필요한 필드만 남긴다
+  // 전적 표시에 필요한 필드만 남긴다 (풀 응답은 매우 큼)
   const match: MatchInfo = {
     matchId,
     gameCreation: raw.info.gameCreation,
@@ -247,6 +275,14 @@ export async function getMatch(
       deaths: p.deaths,
       assists: p.assists,
       teamPosition: p.teamPosition,
+      champLevel: p.champLevel,
+      cs: p.totalMinionsKilled + p.neutralMinionsKilled,
+      goldEarned: p.goldEarned,
+      damage: p.totalDamageDealtToChampions,
+      visionScore: p.visionScore,
+      spell1Id: p.summoner1Id,
+      spell2Id: p.summoner2Id,
+      items: [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5, p.item6],
     })),
   };
   await saveMatchRow(keyFp(), platform, match).catch(() => {});

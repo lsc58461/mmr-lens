@@ -43,6 +43,15 @@ export interface MatchParticipant {
   deaths: number;
   assists: number;
   teamPosition: string;
+  // 전적 상세 (구버전 저장 매치엔 없을 수 있어 옵셔널)
+  champLevel?: number;
+  cs?: number;
+  goldEarned?: number;
+  damage?: number; // 챔피언 대상 딜량
+  visionScore?: number;
+  spell1Id?: number;
+  spell2Id?: number;
+  items?: number[]; // item0~6 (0은 빈 칸)
 }
 
 export interface MatchInfo {

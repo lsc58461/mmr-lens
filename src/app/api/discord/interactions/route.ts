@@ -89,16 +89,23 @@ async function handleMmr(token: string, summoner: string): Promise<void> {
     return;
   }
   try {
-    const stored =
+    let stored =
       (await getStoredResult("deep", PLATFORM, id.gameName, id.tagLine)) ??
-      (await getStoredResult("quick", PLATFORM, id.gameName, id.tagLine)) ??
-      (await runQuickAnalysis(PLATFORM, id.gameName, id.tagLine));
+      (await getStoredResult("quick", PLATFORM, id.gameName, id.tagLine));
+    if (!stored) {
+      // 저장된 분석이 없으면 안내 메시지를 먼저 띄우고 분석 후 결과로 수정
+      await followUp(token, {
+        content: `🔍 **${id.gameName}#${id.tagLine}** 분석 중이에요… 최대 1~2분 걸릴 수 있어요`,
+      });
+      stored = await runQuickAnalysis(PLATFORM, id.gameName, id.tagLine);
+    }
     const name = `${stored.account.gameName}#${stored.account.tagLine}`;
     const est = stored.estimatedRank?.label ?? "표본 부족";
     const cur = stored.currentRank?.label ?? "언랭크";
     const gap =
       stored.gap !== null ? `${stored.gap > 0 ? "+" : ""}${stored.gap}pt` : "-";
     await followUp(token, {
+      content: "", // 분석 중 안내 문구 제거
       embeds: [
         {
           title: `${name} 의 추정 MMR`,

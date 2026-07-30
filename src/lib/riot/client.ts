@@ -26,9 +26,11 @@ import {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const SUMMONER_FRESH_MS = 24 * 60 * 60_000;
-// 참가자 랭크는 로비 평균 표본이라 수 시간 묵어도 오차 미미 — 재사용률을 높인다.
+// 참가자 랭크는 로비 평균 표본이라 하루 묵어도 오차 미미 — 24h 캐시로 재사용률을
+// 극대화한다. 한 분석에서 조회·적재한 참가자 랭크(league_snapshots)를 이후 다른
+// 소환사 분석·같은 로비·quick→deep 사이에서 공유해 라이엇 API 콜을 크게 아낀다.
 // 검색 대상 본인 랭크는 bypassCache로 항상 최신을 받아 표시 정확도를 유지한다.
-const LEAGUE_FRESH_MS = 6 * 60 * 60_000;
+const LEAGUE_FRESH_MS = 24 * 60 * 60_000;
 
 // PUUID는 API 키 단위로 암호화되므로, 키가 바뀌면 저장 데이터를 새로 받도록
 // 키 지문(fingerprint)으로 스코프한다

@@ -127,6 +127,18 @@ async function initSchema(sql: Sql): Promise<void> {
       verified_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (platform, game_name_lower, tag_line_lower)
     );
+    -- 닉변 이력 — 옛 이름 → 현재 이름 매핑. API 키가 바뀌어도(puuid 재암호화)
+    -- 이름 매핑은 살아남아 옛 링크 리다이렉트가 계속 동작한다.
+    CREATE TABLE IF NOT EXISTS name_history (
+      platform text NOT NULL,
+      old_name_lower text NOT NULL,
+      old_tag_lower text NOT NULL,
+      new_game_name text NOT NULL,
+      new_tag_line text NOT NULL,
+      changed_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (platform, old_name_lower, old_tag_lower)
+    );
+
     -- 닉변 승계용 puuid 인덱스 (닉네임이 바뀌어도 같은 계정으로 이어짐)
     ALTER TABLE analyses ADD COLUMN IF NOT EXISTS puuid text;
     CREATE INDEX IF NOT EXISTS analyses_puuid_idx ON analyses (puuid, kind);

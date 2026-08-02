@@ -10,6 +10,7 @@ import {
   latestLeagueSnapshot,
   listLeagueSnapshots,
   migrateIdentity,
+  recordNameChange,
   saveMatchRow,
   updateSummonerProfile,
   upsertSummonerNames,
@@ -107,6 +108,19 @@ export async function getAccountByRiotId(
     account.gameName,
     account.tagLine,
   );
+  // 닉변 감지 — 입력한 이름과 실제 반환된 이름이 다르면(대소문자 제외) 이력 기록
+  if (
+    gameName.toLowerCase() !== account.gameName.toLowerCase() ||
+    tagLine.toLowerCase() !== account.tagLine.toLowerCase()
+  ) {
+    await recordNameChange(
+      platform,
+      gameName,
+      tagLine,
+      account.gameName,
+      account.tagLine,
+    ).catch(() => {});
+  }
   // 닉변 승계 — 같은 puuid의 옛 닉네임 기록을 새 닉네임으로 정리
   await migrateIdentity(
     platform,

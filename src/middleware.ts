@@ -23,10 +23,52 @@ async function isMaintenanceOn(origin: string): Promise<boolean> {
   return cached.on;
 }
 
+// 닉변 리다이렉트 — 옛 이름으로 들어온 소환사 페이지를 새 이름으로 보낸다.
+// (저장된 분석이 남아 있으면 페이지가 404를 안 내므로 여기서 먼저 처리)
+const renameCache = new Map<string, { to: string | null; at: number }>();
+const RENAME_CACHE_MS = 60_000;
+
+async function lookupRenamed(
+  origin: string,
+  region: string,
+  riotId: string,
+): Promise<string | null> {
+  const key = `${region}:${riotId}`;
+  const hit = renameCache.get(key);
+  if (hit && Date.now() - hit.at < RENAME_CACHE_MS) return hit.to;
+  try {
+    const res = await fetch(
+      `${origin}/api/renamed?region=${region}&riotId=${encodeURIComponent(riotId)}`,
+      { signal: AbortSignal.timeout(3_000) },
+    );
+    const data: { renamed: string | null } = await res.json();
+    if (renameCache.size > 500) renameCache.clear();
+    renameCache.set(key, { to: data.renamed, at: Date.now() });
+    return data.renamed;
+  } catch {
+    return null;
+  }
+}
+
 export async function middleware(req: NextRequest) {
   if (req.nextUrl.pathname === "/maintenance") return NextResponse.next();
   if (await isMaintenanceOn(req.nextUrl.origin)) {
     return NextResponse.rewrite(new URL("/maintenance", req.url));
+  }
+
+  const m = req.nextUrl.pathname.match(/^\/summoner\/([^/]+)\/([^/]+)$/);
+  if (m && !req.nextUrl.searchParams.has("renamed")) {
+    const region = m[1];
+    const riotId = decodeURIComponent(m[2]).normalize("NFKC");
+    const to = await lookupRenamed(req.nextUrl.origin, region, riotId);
+    if (to && to !== riotId) {
+      const url = new URL(
+        `/summoner/${region}/${encodeURIComponent(to)}`,
+        req.url,
+      );
+      url.searchParams.set("renamed", riotId);
+      return NextResponse.redirect(url, 308);
+    }
   }
   return NextResponse.next();
 }

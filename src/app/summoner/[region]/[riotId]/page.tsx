@@ -55,8 +55,13 @@ import {
   getAccountByRiotId,
   getLeagueHistory,
   getSummoner,
+  riotKeyFp,
 } from "@/lib/riot/client";
-import { findPuuidByOldName } from "@/lib/store";
+import {
+  findPuuidByOldName,
+  findRenamedTo,
+  recordNameChange,
+} from "@/lib/store";
 import {
   RiotApiError,
   PLATFORM_LABELS,
@@ -227,10 +232,24 @@ export default async function SummonerPage({
       ua,
     );
 
+  const platform = region as PlatformRegion;
+
+  // 닉변 이력이 있으면(저장된 분석이 남아 있어도) 새 이름으로 먼저 이동
+  const known = await findRenamedTo(platform, gameName, tagLine).catch(
+    () => null,
+  );
+  if (known) {
+    const knownId = `${known.gameName}#${known.tagLine}`;
+    if (knownId !== decoded) {
+      redirect(
+        `/summoner/${region}/${encodeURIComponent(knownId)}?renamed=${encodeURIComponent(decoded)}`,
+      );
+    }
+  }
+
   // 최신 매치 ID가 그대로면 저장된 분석(정밀 우선)을 재사용하고,
   // 새 경기가 생겼으면: 이전 분석이 있으면 일단 보여주며 백그라운드 재분석(stale),
   // 아무것도 없으면(첫 검색) 즉시 분석한다.
-  const platform = region as PlatformRegion;
   let result;
   let mode: "quick" | "deep" | "stale" = "quick";
   try {
@@ -272,22 +291,38 @@ export default async function SummonerPage({
     }
   } catch (e) {
     if (e instanceof RiotApiError && e.status === 404) {
-      // 닉변 가능성 — 저장된 기록의 puuid로 현재 이름을 역조회해 새 주소로 이동
-      const oldPuuid = await findPuuidByOldName(
-        platform,
-        gameName,
-        tagLine,
-      ).catch(() => null);
-      if (oldPuuid) {
-        const current = await getAccountByPuuid(platform, oldPuuid);
-        const currentId = current
-          ? `${current.gameName}#${current.tagLine}`
-          : null;
-        if (currentId && currentId !== decoded) {
-          redirect(
-            `/summoner/${region}/${encodeURIComponent(currentId)}?renamed=${encodeURIComponent(decoded)}`,
-          );
+      // 닉변 가능성 — ① 닉변 이력에서 새 이름을 찾고, ② 없으면 저장된 puuid로 역조회
+      const renamedTo = await findRenamedTo(platform, gameName, tagLine).catch(
+        () => null,
+      );
+      let currentId = renamedTo
+        ? `${renamedTo.gameName}#${renamedTo.tagLine}`
+        : null;
+      if (!currentId) {
+        const oldPuuid = await findPuuidByOldName(
+          platform,
+          gameName,
+          tagLine,
+          riotKeyFp(),
+        ).catch(() => null);
+        if (oldPuuid) {
+          const current = await getAccountByPuuid(platform, oldPuuid);
+          if (current) {
+            currentId = `${current.gameName}#${current.tagLine}`;
+            await recordNameChange(
+              platform,
+              gameName,
+              tagLine,
+              current.gameName,
+              current.tagLine,
+            ).catch(() => {});
+          }
         }
+      }
+      if (currentId && currentId !== decoded) {
+        redirect(
+          `/summoner/${region}/${encodeURIComponent(currentId)}?renamed=${encodeURIComponent(decoded)}`,
+        );
       }
       return (
         <ErrorCard

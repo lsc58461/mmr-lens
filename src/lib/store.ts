@@ -220,11 +220,32 @@ export async function findPuuidByOldName(
   platform: PlatformRegion,
   gameName: string,
   tagLine: string,
+  fp?: string,
 ): Promise<string | null> {
   const sql = await getSql();
   const nameLower = gameName.toLowerCase();
   const tagLower = tagLine.toLowerCase();
-  const rows = await sql`
+  // summoners는 puuid PK라 옛 이름이 남아 있는 경우가 많다(가장 신뢰도 높은 소스).
+  // puuid 컬럼 추가 이전에 저장된 analyses/recent_searches는 puuid가 비어 있을 수 있다.
+  // PUUID는 API 키 단위 암호화라, 현재 키 지문(fp)의 행만 유효하다
+  const rows = fp
+    ? await sql`
+        SELECT puuid FROM summoners
+        WHERE fp = ${fp} AND platform = ${platform}
+          AND lower(game_name) = ${nameLower} AND lower(tag_line) = ${tagLower}
+        ORDER BY updated_at DESC LIMIT 1`
+    : await sql`
+        SELECT puuid FROM summoners
+        WHERE platform = ${platform}
+          AND lower(game_name) = ${nameLower} AND lower(tag_line) = ${tagLower}
+        ORDER BY updated_at DESC LIMIT 1`;
+  if (rows[0]) return rows[0].puuid as string;
+
+  const fallback = await sql`
+    SELECT puuid FROM verified_summoners
+    WHERE platform = ${platform}
+      AND game_name_lower = ${nameLower} AND tag_line_lower = ${tagLower}
+    UNION ALL
     SELECT puuid FROM analyses
     WHERE platform = ${platform} AND puuid IS NOT NULL
       AND game_name_lower = ${nameLower} AND tag_line_lower = ${tagLower}
@@ -232,12 +253,51 @@ export async function findPuuidByOldName(
     SELECT puuid FROM recent_searches
     WHERE platform = ${platform} AND puuid IS NOT NULL
       AND game_name_lower = ${nameLower} AND tag_line_lower = ${tagLower}
-    UNION ALL
-    SELECT puuid FROM verified_summoners
-    WHERE platform = ${platform}
-      AND game_name_lower = ${nameLower} AND tag_line_lower = ${tagLower}
     LIMIT 1`;
-  return (rows[0]?.puuid as string | undefined) ?? null;
+  return (fallback[0]?.puuid as string | undefined) ?? null;
+}
+
+/** 닉변 이력 조회 — 옛 이름으로 검색됐을 때 현재 이름 반환 */
+export async function findRenamedTo(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<{ gameName: string; tagLine: string } | null> {
+  const sql = await getSql();
+  const rows = await sql`
+    SELECT new_game_name, new_tag_line FROM name_history
+    WHERE platform = ${platform}
+      AND old_name_lower = ${gameName.toLowerCase()}
+      AND old_tag_lower = ${tagLine.toLowerCase()}`;
+  const r = rows[0];
+  return r
+    ? { gameName: r.new_game_name as string, tagLine: r.new_tag_line as string }
+    : null;
+}
+
+/** 닉변 이력 기록 (옛 이름 → 새 이름) */
+export async function recordNameChange(
+  platform: PlatformRegion,
+  oldGameName: string,
+  oldTagLine: string,
+  newGameName: string,
+  newTagLine: string,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    INSERT INTO name_history
+      (platform, old_name_lower, old_tag_lower, new_game_name, new_tag_line)
+    VALUES (${platform}, ${oldGameName.toLowerCase()}, ${oldTagLine.toLowerCase()},
+            ${newGameName}, ${newTagLine})
+    ON CONFLICT (platform, old_name_lower, old_tag_lower) DO UPDATE
+    SET new_game_name = EXCLUDED.new_game_name,
+        new_tag_line = EXCLUDED.new_tag_line, changed_at = now()`;
+  // 옛 이름이 다른 계정의 새 이름으로 기록돼 있으면 체인이 꼬이므로 정리
+  await sql`
+    DELETE FROM name_history
+    WHERE platform = ${platform}
+      AND old_name_lower = ${newGameName.toLowerCase()}
+      AND old_tag_lower = ${newTagLine.toLowerCase()}`;
 }
 
 /** 닉변 감지: puuid로 저장된 옛 닉네임 행들을 새 닉네임으로 이관 */

@@ -127,6 +127,12 @@ async function initSchema(sql: Sql): Promise<void> {
       verified_at timestamptz NOT NULL DEFAULT now(),
       PRIMARY KEY (platform, game_name_lower, tag_line_lower)
     );
+    -- 닉변 승계용 puuid 인덱스 (닉네임이 바뀌어도 같은 계정으로 이어짐)
+    ALTER TABLE analyses ADD COLUMN IF NOT EXISTS puuid text;
+    CREATE INDEX IF NOT EXISTS analyses_puuid_idx ON analyses (puuid, kind);
+    ALTER TABLE recent_searches ADD COLUMN IF NOT EXISTS puuid text;
+    CREATE INDEX IF NOT EXISTS recent_searches_puuid_idx ON recent_searches (puuid);
+
     ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS discord_user_id text;
     ALTER TABLE verified_summoners ADD COLUMN IF NOT EXISTS discord_username text;
     -- 알림 상태 (마지막 알림 기준 랭크·시즌 최고·연승 마일스톤)

@@ -9,6 +9,7 @@ import {
   insertLeagueSnapshot,
   latestLeagueSnapshot,
   listLeagueSnapshots,
+  migrateIdentity,
   saveMatchRow,
   updateSummonerProfile,
   upsertSummonerNames,
@@ -106,6 +107,13 @@ export async function getAccountByRiotId(
     account.gameName,
     account.tagLine,
   );
+  // 닉변 승계 — 같은 puuid의 옛 닉네임 기록을 새 닉네임으로 정리
+  await migrateIdentity(
+    platform,
+    account.puuid,
+    account.gameName,
+    account.tagLine,
+  ).catch(() => {});
   return account;
 }
 

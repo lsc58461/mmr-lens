@@ -189,11 +189,16 @@ export async function listLeagueSnapshots(
 
 // ── 분석 결과 ───────────────────────────────────────────
 
+/**
+ * 저장된 분석 조회. 닉네임으로 먼저 찾고, 없으면 puuid로 승계 조회한다
+ * (닉변 시 이전 분석을 잃지 않도록).
+ */
 export async function getAnalysis(
   kind: "quick" | "deep",
   platform: PlatformRegion,
   gameName: string,
   tagLine: string,
+  puuid?: string,
 ): Promise<MmrEstimate | null> {
   const sql = await getSql();
   const rows = await sql`
@@ -201,7 +206,40 @@ export async function getAnalysis(
     WHERE platform = ${platform} AND kind = ${kind}
       AND game_name_lower = ${gameName.toLowerCase()}
       AND tag_line_lower = ${tagLine.toLowerCase()}`;
-  return (rows[0]?.result as MmrEstimate | undefined) ?? null;
+  if (rows[0]) return rows[0].result as MmrEstimate;
+  if (!puuid) return null;
+  const byPuuid = await sql`
+    SELECT result FROM analyses
+    WHERE puuid = ${puuid} AND kind = ${kind}
+    ORDER BY updated_at DESC LIMIT 1`;
+  return (byPuuid[0]?.result as MmrEstimate | undefined) ?? null;
+}
+
+/** 닉변 감지: puuid로 저장된 옛 닉네임 행들을 새 닉네임으로 이관 */
+export async function migrateIdentity(
+  platform: PlatformRegion,
+  puuid: string,
+  gameName: string,
+  tagLine: string,
+): Promise<void> {
+  const sql = await getSql();
+  const nameLower = gameName.toLowerCase();
+  const tagLower = tagLine.toLowerCase();
+  // 같은 puuid인데 이름이 다른 옛 행 제거 후, 새 이름 행으로 puuid를 기록
+  await sql`
+    DELETE FROM analyses
+    WHERE puuid = ${puuid} AND platform = ${platform}
+      AND (game_name_lower <> ${nameLower} OR tag_line_lower <> ${tagLower})`;
+  await sql`
+    DELETE FROM recent_searches
+    WHERE puuid = ${puuid} AND platform = ${platform}
+      AND (game_name_lower <> ${nameLower} OR tag_line_lower <> ${tagLower})`;
+  await sql`
+    UPDATE verified_summoners
+    SET game_name = ${gameName}, tag_line = ${tagLine},
+        game_name_lower = ${nameLower}, tag_line_lower = ${tagLower}
+    WHERE puuid = ${puuid} AND platform = ${platform}
+      AND (game_name_lower <> ${nameLower} OR tag_line_lower <> ${tagLower})`;
 }
 
 export async function saveAnalysis(
@@ -210,21 +248,23 @@ export async function saveAnalysis(
   gameName: string,
   tagLine: string,
   result: MmrEstimate,
+  puuid?: string,
 ): Promise<void> {
   const sql = await getSql();
   await sql`
     INSERT INTO analyses
       (platform, game_name_lower, tag_line_lower, kind, game_name, tag_line,
-       algo_version, latest_match_id, analyzed_at, result)
+       algo_version, latest_match_id, analyzed_at, result, puuid)
     VALUES (${platform}, ${gameName.toLowerCase()}, ${tagLine.toLowerCase()}, ${kind},
             ${result.account.gameName}, ${result.account.tagLine},
             ${result.algoVersion ?? null}, ${result.latestMatchId ?? null},
             ${result.analyzedAt ? new Date(result.analyzedAt) : null},
-            ${sql.json(result as never)})
+            ${sql.json(result as never)}, ${puuid ?? null})
     ON CONFLICT (platform, game_name_lower, tag_line_lower, kind) DO UPDATE
     SET game_name = EXCLUDED.game_name, tag_line = EXCLUDED.tag_line,
         algo_version = EXCLUDED.algo_version, latest_match_id = EXCLUDED.latest_match_id,
-        analyzed_at = EXCLUDED.analyzed_at, result = EXCLUDED.result, updated_at = now()`;
+        analyzed_at = EXCLUDED.analyzed_at, result = EXCLUDED.result,
+        puuid = COALESCE(EXCLUDED.puuid, analyses.puuid), updated_at = now()`;
 }
 
 export interface AnalysisMeta {
@@ -272,6 +312,7 @@ export interface RecentSearchInput {
   estimatedLabel: string | null;
   estimatedTier: string | null;
   estimatedPoints: number | null;
+  puuid?: string | null; // 닉변 승계용
 }
 
 export async function upsertRecentSearch(r: RecentSearchInput): Promise<void> {
@@ -279,15 +320,18 @@ export async function upsertRecentSearch(r: RecentSearchInput): Promise<void> {
   await sql`
     INSERT INTO recent_searches
       (platform, game_name_lower, tag_line_lower, game_name, tag_line,
-       current_label, current_tier, estimated_label, estimated_tier, estimated_points, searched_at)
+       current_label, current_tier, estimated_label, estimated_tier, estimated_points,
+       puuid, searched_at)
     VALUES (${r.platform}, ${r.gameName.toLowerCase()}, ${r.tagLine.toLowerCase()},
             ${r.gameName}, ${r.tagLine}, ${r.currentLabel}, ${r.currentTier},
-            ${r.estimatedLabel}, ${r.estimatedTier}, ${r.estimatedPoints}, now())
+            ${r.estimatedLabel}, ${r.estimatedTier}, ${r.estimatedPoints},
+            ${r.puuid ?? null}, now())
     ON CONFLICT (platform, game_name_lower, tag_line_lower) DO UPDATE
     SET game_name = EXCLUDED.game_name, tag_line = EXCLUDED.tag_line,
         current_label = EXCLUDED.current_label, current_tier = EXCLUDED.current_tier,
         estimated_label = EXCLUDED.estimated_label, estimated_tier = EXCLUDED.estimated_tier,
-        estimated_points = EXCLUDED.estimated_points, searched_at = now()`;
+        estimated_points = EXCLUDED.estimated_points,
+        puuid = COALESCE(EXCLUDED.puuid, recent_searches.puuid), searched_at = now()`;
 }
 
 export interface RecentSearchRow {

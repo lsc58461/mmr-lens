@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -50,10 +51,12 @@ import {
 } from "@/lib/mmr/lp-insight";
 import { recordSearch } from "@/lib/recent";
 import {
+  getAccountByPuuid,
   getAccountByRiotId,
   getLeagueHistory,
   getSummoner,
 } from "@/lib/riot/client";
+import { findPuuidByOldName } from "@/lib/store";
 import {
   RiotApiError,
   PLATFORM_LABELS,
@@ -187,10 +190,13 @@ function ErrorCard({
 
 export default async function SummonerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ region: string; riotId: string }>;
+  searchParams: Promise<{ renamed?: string }>;
 }) {
   const { region, riotId } = await params;
+  const { renamed } = await searchParams;
   if (!(region in PLATFORM_LABELS)) {
     return (
       <ErrorCard
@@ -266,6 +272,23 @@ export default async function SummonerPage({
     }
   } catch (e) {
     if (e instanceof RiotApiError && e.status === 404) {
+      // 닉변 가능성 — 저장된 기록의 puuid로 현재 이름을 역조회해 새 주소로 이동
+      const oldPuuid = await findPuuidByOldName(
+        platform,
+        gameName,
+        tagLine,
+      ).catch(() => null);
+      if (oldPuuid) {
+        const current = await getAccountByPuuid(platform, oldPuuid);
+        const currentId = current
+          ? `${current.gameName}#${current.tagLine}`
+          : null;
+        if (currentId && currentId !== decoded) {
+          redirect(
+            `/summoner/${region}/${encodeURIComponent(currentId)}?renamed=${encodeURIComponent(decoded)}`,
+          );
+        }
+      }
       return (
         <ErrorCard
           title="소환사를 찾을 수 없어요"
@@ -356,6 +379,14 @@ export default async function SummonerPage({
 
   return (
     <div className="space-y-5">
+      {/* 닉변 리다이렉트 안내 */}
+      {renamed && renamed !== decoded && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm">
+          <b>{renamed}</b> 님은 <b>{decoded}</b> 로 닉네임을 변경했어요 — 새
+          이름으로 이동했습니다.
+        </div>
+      )}
+
       {/* 헤더 */}
       <div className="flex flex-wrap items-end justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
         <div className="flex items-center gap-3">

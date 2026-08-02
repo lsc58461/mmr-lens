@@ -215,6 +215,31 @@ export async function getAnalysis(
   return (byPuuid[0]?.result as MmrEstimate | undefined) ?? null;
 }
 
+/** 옛 닉네임으로 저장된 기록에서 puuid를 찾는다 (닉변 역조회용) */
+export async function findPuuidByOldName(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<string | null> {
+  const sql = await getSql();
+  const nameLower = gameName.toLowerCase();
+  const tagLower = tagLine.toLowerCase();
+  const rows = await sql`
+    SELECT puuid FROM analyses
+    WHERE platform = ${platform} AND puuid IS NOT NULL
+      AND game_name_lower = ${nameLower} AND tag_line_lower = ${tagLower}
+    UNION ALL
+    SELECT puuid FROM recent_searches
+    WHERE platform = ${platform} AND puuid IS NOT NULL
+      AND game_name_lower = ${nameLower} AND tag_line_lower = ${tagLower}
+    UNION ALL
+    SELECT puuid FROM verified_summoners
+    WHERE platform = ${platform}
+      AND game_name_lower = ${nameLower} AND tag_line_lower = ${tagLower}
+    LIMIT 1`;
+  return (rows[0]?.puuid as string | undefined) ?? null;
+}
+
 /** 닉변 감지: puuid로 저장된 옛 닉네임 행들을 새 닉네임으로 이관 */
 export async function migrateIdentity(
   platform: PlatformRegion,

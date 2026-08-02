@@ -117,6 +117,32 @@ export async function getAccountByRiotId(
   return account;
 }
 
+/**
+ * puuid로 현재 Riot ID 조회 — 닉변 후 새 이름을 찾을 때 사용.
+ * 저장된 기록의 옛 이름으로 검색됐을 때 리다이렉트 대상을 알아낸다.
+ */
+export async function getAccountByPuuid(
+  platform: PlatformRegion,
+  puuid: string,
+): Promise<RiotAccount | null> {
+  const routing = PLATFORM_TO_ROUTING[platform];
+  try {
+    const account = await riotFetch<RiotAccount>(
+      `https://${routing}.api.riotgames.com/riot/account/v1/accounts/by-puuid/${puuid}`,
+    );
+    await upsertSummonerNames(
+      keyFp(),
+      platform,
+      account.puuid,
+      account.gameName,
+      account.tagLine,
+    ).catch(() => {});
+    return account;
+  } catch {
+    return null;
+  }
+}
+
 /** 소환사 프로필(아이콘/레벨) 조회. bypassCache=true면 항상 최신(아이콘 인증용) */
 export async function getSummoner(
   platform: PlatformRegion,

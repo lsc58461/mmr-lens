@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "crypto";
 import { currentPriority, riotLimiter } from "./limiter";
+import { recordRateLimitHit, trackRateLimiter } from "./rate-status";
 import { cache, cached } from "@/lib/cache";
 import {
   clearRenameMapping,
@@ -54,6 +55,7 @@ async function riotFetch<T>(url: string): Promise<T> {
 
   // 429는 다른 인스턴스와의 합산 한도 초과일 수 있어 더 끈질기게 재시도한다
   for (let attempt = 0; attempt < 6; attempt++) {
+    trackRateLimiter(); // 어드민 관측용 — 대기가 시작되기 전에 발행을 켠다
     await riotLimiter.acquire(currentPriority());
     let res: Response;
     try {
@@ -70,6 +72,7 @@ async function riotFetch<T>(url: string): Promise<T> {
     if (res.ok) return res.json() as Promise<T>;
     if (res.status === 429) {
       const retryAfter = Number(res.headers.get("Retry-After") ?? "5");
+      await recordRateLimitHit(retryAfter, url).catch(() => {});
       await sleep(retryAfter * 1000 + 500);
       continue;
     }

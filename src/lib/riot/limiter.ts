@@ -27,6 +27,23 @@ export function currentPriority(): Priority {
   return priorityContext.getStore() ?? "high";
 }
 
+export interface BucketState {
+  capacity: number;
+  windowMs: number;
+  used: number;
+  /** 이 버킷이 꽉 찼을 때 다음 슬롯이 열리기까지 남은 ms (여유 있으면 0) */
+  nextSlotInMs: number;
+}
+
+export interface LimiterSnapshot {
+  buckets: BucketState[];
+  waitingHigh: number;
+  waitingLow: number;
+  /** 지금 요청하면 슬롯을 받기까지 최소 대기 ms (0이면 즉시) */
+  nextSlotInMs: number;
+  saturated: boolean;
+}
+
 class RateLimiter {
   private buckets: Bucket[];
   private high: Array<() => void> = [];
@@ -35,6 +52,28 @@ class RateLimiter {
 
   constructor(limits: Array<{ capacity: number; windowMs: number }>) {
     this.buckets = limits.map((l) => ({ ...l, timestamps: [] }));
+  }
+
+  /** 현재 한도 사용량·대기 큐 상태 (관측용 — 내부 상태를 변형하지 않는다) */
+  snapshot(): LimiterSnapshot {
+    const now = Date.now();
+    const buckets = this.buckets.map((b): BucketState => {
+      const live = b.timestamps.filter((t) => now - t < b.windowMs);
+      const full = live.length >= b.capacity;
+      return {
+        capacity: b.capacity,
+        windowMs: b.windowMs,
+        used: live.length,
+        nextSlotInMs: full ? Math.max(0, live[0] + b.windowMs - now) : 0,
+      };
+    });
+    return {
+      buckets,
+      waitingHigh: this.high.length,
+      waitingLow: this.low.length,
+      nextSlotInMs: Math.max(0, ...buckets.map((b) => b.nextSlotInMs)),
+      saturated: buckets.some((b) => b.used >= b.capacity),
+    };
   }
 
   /** 슬롯이 날 때까지 대기 후 반환. high 큐가 항상 low 큐보다 먼저 소진된다 */

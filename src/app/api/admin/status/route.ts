@@ -3,6 +3,7 @@ import { ADMIN_COOKIE, isValidAdminSession } from "@/lib/admin";
 import { getRunnerStatus, listQueue } from "@/lib/mmr/deep-jobs";
 import { ALGO_VERSION } from "@/lib/mmr/estimate";
 import { getRecentSearches } from "@/lib/recent";
+import { getRateLimitStatus } from "@/lib/riot/rate-status";
 import { listAnalysesMeta } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -15,9 +16,10 @@ export async function GET(req: NextRequest) {
   const now = Date.now();
   // 실행 중·대기열은 deep-jobs가 제공한다 — 어드민이 규칙을 따로 구현하면
   // 실제 스케줄러가 보는 대기열과 어긋난다(하트비트 끊긴 상위 순번이 숨는 문제)
-  const [running, waiting, recent] = await Promise.all([
+  const [running, waiting, rate, recent] = await Promise.all([
     getRunnerStatus(),
     listQueue(),
+    getRateLimitStatus(),
     getRecentSearches(),
   ]);
 
@@ -77,6 +79,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     running,
     waiting,
+    rate,
     summoners,
     serverTime: now,
   });

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, Clock, Database, Users } from "lucide-react";
+import { Activity, Clock, Database, Gauge, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -11,8 +11,129 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { fetchAdminStatus, type AdminStatus } from "./types";
+import {
+  RATE_STATES,
+  countdown,
+  fetchAdminStatus,
+  windowLabel,
+  type AdminStatus,
+} from "./types";
 import { EmptyState, LiveDot, PageHeader, StatTile } from "./ui";
+
+/**
+ * 라이엇 API 한도 카드.
+ * resumeInMs는 응답 시점 기준이라, 받은 순간의 로컬 시각을 더해 마감 시각을
+ * 만들고 폴링(5초) 사이에는 클라이언트에서 직접 카운트다운한다.
+ */
+function RateCard({
+  rate,
+  receivedAt,
+}: {
+  rate: AdminStatus["rate"];
+  receivedAt: number;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 200);
+    return () => clearInterval(id);
+  }, []);
+
+  const s = RATE_STATES[rate.state];
+  const remaining = Math.max(0, receivedAt + rate.resumeInMs - now);
+  const waiting = rate.waitingHigh + rate.waitingLow;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <Gauge className="size-4 text-primary" />
+          라이엇 API 한도
+          <span
+            className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${s.cls}`}
+          >
+            <span className={`size-1.5 rounded-full ${s.dot}`} />
+            {s.label}
+          </span>
+        </CardTitle>
+        <CardDescription>{s.note}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <div className="text-xs text-muted-foreground">재개까지</div>
+            <div className="mt-0.5 text-2xl font-bold tabular-nums">
+              {remaining > 0 ? countdown(remaining) : "여유"}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">대기 중인 호출</div>
+            <div className="mt-0.5 text-2xl font-bold tabular-nums">
+              {waiting}
+            </div>
+            {waiting > 0 && (
+              <div className="text-xs text-muted-foreground">
+                전경 {rate.waitingHigh} · 배경 {rate.waitingLow}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">보고 인스턴스</div>
+            <div className="mt-0.5 text-2xl font-bold tabular-nums">
+              {rate.nodes}
+            </div>
+          </div>
+        </div>
+
+        {rate.buckets.length > 0 && (
+          <div className="space-y-2">
+            {rate.buckets.map((b) => {
+              const pct = Math.min(100, (b.used / b.capacity) * 100);
+              const full = b.used >= b.capacity;
+              return (
+                <div key={b.windowMs}>
+                  <div className="flex items-baseline justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      {windowLabel(b.windowMs)}당
+                    </span>
+                    <span className="tabular-nums">
+                      {b.used} / {b.capacity}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        full ? "bg-amber-500" : "bg-primary"
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {rate.cooldown && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
+            <span className="font-medium text-destructive">
+              429 · Retry-After {rate.cooldown.retryAfterSec}초
+            </span>
+            <span className="ml-2 text-muted-foreground">
+              {rate.cooldown.endpoint}
+            </span>
+          </div>
+        )}
+
+        {rate.nodes === 0 && !rate.cooldown && (
+          <p className="text-xs text-muted-foreground">
+            최근 라이엇 호출이 없어 보고된 상태가 없어요 — 호출이 시작되면 자동으로
+            표시됩니다
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function DashboardPanel() {
   const router = useRouter();
@@ -47,6 +168,8 @@ export function DashboardPanel() {
     status?.summoners.filter((s) => s.analysis === "deep").length ?? 0;
   const running = status?.running;
   const waiting = status?.waiting ?? [];
+  const rate = status?.rate;
+  const rateState = RATE_STATES[rate?.state ?? "idle"];
 
   return (
     <div className="space-y-5">
@@ -65,7 +188,7 @@ export function DashboardPanel() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <StatTile
           icon={Activity}
           label="실행 중 분석"
@@ -81,6 +204,25 @@ export function DashboardPanel() {
           tone={waiting.length ? "amber" : "muted"}
         />
         <StatTile
+          icon={Gauge}
+          label="API 한도"
+          value={rateState.label}
+          sub={
+            rate && rate.resumeInMs > 0
+              ? `재개까지 ${countdown(rate.resumeInMs)}`
+              : `대기 ${(rate?.waitingHigh ?? 0) + (rate?.waitingLow ?? 0)}건`
+          }
+          tone={
+            rate?.state === "cooldown"
+              ? "amber"
+              : rate?.state === "throttled"
+                ? "amber"
+                : rate?.state === "busy"
+                  ? "primary"
+                  : "muted"
+          }
+        />
+        <StatTile
           icon={Users}
           label="기록 소환사"
           value={total}
@@ -94,6 +236,8 @@ export function DashboardPanel() {
           tone={total && deepFresh === total ? "emerald" : "muted"}
         />
       </div>
+
+      {rate && updatedAt && <RateCard rate={rate} receivedAt={updatedAt} />}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>

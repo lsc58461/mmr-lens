@@ -65,10 +65,13 @@ export function MatchHistory({
   region,
   riotId,
   ddVersion,
+  bare = false,
 }: {
   region: string;
   riotId: string;
   ddVersion: string;
+  /** 탭 안에 넣을 때처럼 바깥에서 Card를 감쌀 경우 자체 Card·헤더를 생략한다 */
+  bare?: boolean;
 }) {
   const [games, setGames] = useState<Game[] | null>(null);
   const [error, setError] = useState(false);
@@ -89,16 +92,8 @@ export function MatchHistory({
     };
   }, [region, riotId]);
 
-  return (
-    <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-500 fill-mode-backwards">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Swords className="size-4 text-primary" />
-          최근 전적
-        </CardTitle>
-        <CardDescription>최근 솔로랭크 경기 기록</CardDescription>
-      </CardHeader>
-      <CardContent>
+  const body = (
+    <>
         {games === null && !error && (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
@@ -273,7 +268,21 @@ export function MatchHistory({
             채워져요
           </p>
         )}
-      </CardContent>
+    </>
+  );
+
+  if (bare) return body;
+
+  return (
+    <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-500 fill-mode-backwards">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Swords className="size-4 text-primary" />
+          최근 전적
+        </CardTitle>
+        <CardDescription>최근 솔로랭크 경기 기록</CardDescription>
+      </CardHeader>
+      <CardContent>{body}</CardContent>
     </Card>
   );
 }

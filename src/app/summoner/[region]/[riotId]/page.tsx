@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 import { DeepRefine } from "@/components/deep-refine";
 import { LobbyDistribution } from "@/components/lobby-distribution";
-import { MatchHistory } from "@/components/match-history";
-import { MatchList, type MatchRow } from "@/components/match-list";
+import { type MatchRow } from "@/components/match-list";
+import { MatchTabs } from "@/components/match-tabs";
 import { MmrChart, type MmrChartPoint } from "@/components/mmr-chart";
 import { SearchForm } from "@/components/search-form";
 import { ShareButton } from "@/components/share-button";
@@ -254,6 +254,9 @@ export default async function SummonerPage({
   // 아무것도 없으면(첫 검색) 즉시 분석한다.
   let result;
   let mode: "quick" | "deep" | "stale" = "quick";
+  // 크롤러인데 저장된 결과가 없는 경우 — JSX는 try 밖에서 만든다
+  // (try/catch는 렌더 에러를 잡지 못하므로 안에서 JSX를 구성하지 않는다)
+  let botNoData = false;
   try {
     const latestMatchId = await getLatestMatchId(platform, gameName, tagLine);
     const deep = await getFreshDeepResult(
@@ -280,12 +283,7 @@ export default async function SummonerPage({
           result = stale;
           mode = "stale";
         } else if (isBot) {
-          return (
-            <ErrorCard
-              title="아직 분석된 적 없는 소환사예요"
-              description="사이트에서 검색하면 숨은 실력대 분석이 시작됩니다."
-            />
-          );
+          botNoData = true;
         } else {
           result = await runQuickAnalysis(platform, gameName, tagLine);
         }
@@ -342,6 +340,16 @@ export default async function SummonerPage({
       );
     }
     throw e;
+  }
+
+  // 크롤러라 분석을 건너뛴 경우, 그리고 어떤 이유로도 결과가 비었을 때
+  if (botNoData || !result) {
+    return (
+      <ErrorCard
+        title="아직 분석된 적 없는 소환사예요"
+        description="사이트에서 검색하면 숨은 실력대 분석이 시작됩니다."
+      />
+    );
   }
 
   const ddVersion = await getDDragonVersion();
@@ -413,6 +421,7 @@ export default async function SummonerPage({
 
   const verdict = gap !== null ? gapVerdict(gap) : null;
   const estColor = estimatedRank ? TIER_COLORS[estimatedRank.tier] : undefined;
+  const showLobbyDist = matches.some((m) => m.lobbyPoints !== null);
 
   return (
     <div className="space-y-5">
@@ -596,6 +605,16 @@ export default async function SummonerPage({
         </Card>
       </div>
 
+      {/* 짧은 카드 둘(LP 흐름·로비 분포)은 데스크톱에서 나란히 —
+          전부 풀폭으로 쌓으면 페이지가 불필요하게 길어진다.
+          한쪽만 표시될 땐 1열로 두어 반쪽짜리 카드가 되지 않게 한다. */}
+      <div
+        className={`grid gap-4 ${
+          lpInsight && hasLpSignal(lpInsight) && showLobbyDist
+            ? "lg:grid-cols-2"
+            : ""
+        }`}
+      >
       {/* LP 흐름 — 스냅샷이 쌓여야 표시됨 */}
       {lpInsight && hasLpSignal(lpInsight) && (
         <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-backwards">
@@ -649,7 +668,7 @@ export default async function SummonerPage({
       )}
 
       {/* 로비 티어 분포 */}
-      {matches.some((m) => m.lobbyPoints !== null) && (
+      {showLobbyDist && (
         <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-200 fill-mode-backwards">
           <CardHeader>
             <CardTitle className="text-base">로비 티어 분포</CardTitle>
@@ -662,6 +681,7 @@ export default async function SummonerPage({
           </CardContent>
         </Card>
       )}
+      </div>
 
       {/* 추이 차트 */}
       <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300 fill-mode-backwards">
@@ -684,48 +704,32 @@ export default async function SummonerPage({
         </CardContent>
       </Card>
 
-      {/* 최근 전적 (전적검색) */}
-      <MatchHistory region={region} riotId={decoded} ddVersion={ddVersion} />
-
-      {/* 매치 리스트 (실력대 분석 근거) */}
-      <Card className="animate-in fade-in slide-in-from-bottom-2 duration-500 delay-[400ms] fill-mode-backwards">
-        <CardHeader>
-          <CardTitle className="text-base">실력대 분석에 사용된 경기</CardTitle>
-          <CardDescription>
-            로비 평균 랭크 기준 · 최근 {matches.length}경기
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {matches.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              최근 솔로랭크 기록이 없어요.
-            </p>
-          ) : (
-            <MatchList
-              rows={matches.map((m): MatchRow => {
-                const lobby =
-                  m.lobbyPoints !== null
-                    ? pointsToRank(Math.round(m.lobbyPoints))
-                    : null;
-                return {
-                  id: m.matchId,
-                  win: m.win,
-                  iconUrl: m.championName
-                    ? championIconUrl(ddVersion, m.championName)
-                    : null,
-                  champName: championNameKo(champNames, m.championName),
-                  kda: m.kda,
-                  when: timeAgo(m.gameCreation),
-                  lobbyLabel: lobby?.label ?? null,
-                  lobbyTier: lobby?.tier ?? null,
-                  sampleSize: m.sampleSize,
-                  suspectedDuo: m.suspectedDuo ?? false,
-                };
-              })}
-            />
-          )}
-        </CardContent>
-      </Card>
+      {/* 경기 목록 — 최근 전적 / 분석 근거를 탭으로 (세로 길이 절감) */}
+      <MatchTabs
+        region={region}
+        riotId={decoded}
+        ddVersion={ddVersion}
+        rows={matches.map((m): MatchRow => {
+          const lobby =
+            m.lobbyPoints !== null
+              ? pointsToRank(Math.round(m.lobbyPoints))
+              : null;
+          return {
+            id: m.matchId,
+            win: m.win,
+            iconUrl: m.championName
+              ? championIconUrl(ddVersion, m.championName)
+              : null,
+            champName: championNameKo(champNames, m.championName),
+            kda: m.kda,
+            when: timeAgo(m.gameCreation),
+            lobbyLabel: lobby?.label ?? null,
+            lobbyTier: lobby?.tier ?? null,
+            sampleSize: m.sampleSize,
+            suspectedDuo: m.suspectedDuo ?? false,
+          };
+        })}
+      />
 
       <p className="text-xs text-muted-foreground">
         * 라이엇은 실제 실력대(내부 MMR)를 공개하지 않으므로 이 수치는 같은 경기에 배정된

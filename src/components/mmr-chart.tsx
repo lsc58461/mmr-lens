@@ -147,7 +147,7 @@ export function MmrChart({
           // 점이 없으면 로비 선의 패배 점이 이 계열 것으로 오인된다.
           // 테두리는 로비 점과 동일하게 배경색으로 둘러 겹칠 때 구분되게 한다
           dot={{
-            r: 3,
+            r: 3.5,
             fill: EST_COLOR,
             stroke: "var(--background)",
             strokeWidth: 1.5,

@@ -2,44 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, Clock, Database, RefreshCw, Users } from "lucide-react";
+import { Activity, Clock, Database, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { fetchAdminStatus, type AdminStatus } from "./types";
-
-function StatTile({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  accent = false,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: React.ReactNode;
-  sub?: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Icon className={`size-3.5 ${accent ? "text-primary" : ""}`} />
-        {label}
-      </div>
-      <div className="mt-1.5 text-xl font-bold tabular-nums">{value}</div>
-      {sub && (
-        <div className="mt-0.5 truncate text-xs text-muted-foreground">
-          {sub}
-        </div>
-      )}
-    </div>
-  );
-}
+import { EmptyState, LiveDot, PageHeader, StatTile } from "./ui";
 
 export function DashboardPanel() {
   const router = useRouter();
@@ -69,47 +42,56 @@ export function DashboardPanel() {
     };
   }, [router]);
 
+  const total = status?.summoners.length ?? 0;
   const deepFresh =
     status?.summoners.filter((s) => s.analysis === "deep").length ?? 0;
+  const running = status?.running;
+  const waiting = status?.waiting ?? [];
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-lg font-bold tracking-tight">대시보드</h1>
-        <p className="text-xs text-muted-foreground">
-          {updatedAt
-            ? `5초 자동 갱신 · ${new Date(updatedAt).toLocaleTimeString("ko-KR")}`
-            : "불러오는 중…"}
-        </p>
-      </div>
+      <PageHeader
+        title="대시보드"
+        description="정밀 분석 러너와 대기열, 기록된 소환사 현황"
+        actions={
+          <LiveDot
+            on={!!updatedAt}
+            label={
+              updatedAt
+                ? new Date(updatedAt).toLocaleTimeString("ko-KR")
+                : "연결 중"
+            }
+          />
+        }
+      />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile
           icon={Activity}
           label="실행 중 분석"
-          value={
-            status?.running ? `${Math.round(status.running.progress * 100)}%` : "—"
-          }
-          sub={status?.running?.name ?? "없음"}
-          accent={!!status?.running}
+          value={running ? `${Math.round(running.progress * 100)}%` : "유휴"}
+          sub={running?.name ?? "러너 대기 중"}
+          tone={running ? "primary" : "muted"}
         />
         <StatTile
           icon={Clock}
           label="대기열"
-          value={status?.waiting.length ?? 0}
-          sub="정밀 분석 대기"
+          value={waiting.length}
+          sub={waiting.length ? `다음: ${waiting[0].name}` : "대기 없음"}
+          tone={waiting.length ? "amber" : "muted"}
         />
         <StatTile
           icon={Users}
           label="기록 소환사"
-          value={status?.summoners.length ?? 0}
+          value={total}
           sub="최근 검색 기준"
         />
         <StatTile
           icon={Database}
           label="정밀 · 최신"
-          value={`${deepFresh}/${status?.summoners.length ?? 0}`}
-          sub="신선한 정밀 분석"
+          value={`${deepFresh}/${total}`}
+          sub={total ? `${Math.round((deepFresh / total) * 100)}% 신선` : "—"}
+          tone={total && deepFresh === total ? "emerald" : "muted"}
         />
       </div>
 
@@ -120,30 +102,36 @@ export function DashboardPanel() {
               <Activity className="size-4 text-primary" />
               실행 중인 정밀 분석
             </CardTitle>
+            <CardDescription>한 번에 1건만 실행돼요 (러너 락)</CardDescription>
           </CardHeader>
           <CardContent>
-            {status?.running ? (
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{status.running.name}</span>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {status.running.updatedAgoSec}초 전 갱신
+            {running ? (
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="min-w-0 truncate font-medium">
+                    {running.name}
+                  </span>
+                  <span className="text-2xl font-bold tabular-nums">
+                    {Math.round(running.progress * 100)}%
                   </span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${status.running.progress * 100}%` }}
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{ width: `${running.progress * 100}%` }}
                   />
                 </div>
-                <div className="text-right text-xs text-muted-foreground tabular-nums">
-                  {Math.round(status.running.progress * 100)}%
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="uppercase tracking-wide">
+                    {running.region}
+                  </span>
+                  <span className="tabular-nums">
+                    {running.updatedAgoSec}초 전 갱신
+                  </span>
                 </div>
               </div>
             ) : (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                실행 중인 분석이 없어요
-              </p>
+              <EmptyState icon={Activity}>실행 중인 분석이 없어요</EmptyState>
             )}
           </CardContent>
         </Card>
@@ -151,41 +139,55 @@ export function DashboardPanel() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Clock className="size-4 text-chart-2" />
-              대기열 ({status?.waiting.length ?? 0})
+              <Clock className="size-4 text-amber-500" />
+              대기열
+              {waiting.length > 0 && (
+                <Badge variant="secondary" className="tabular-nums">
+                  {waiting.length}
+                </Badge>
+              )}
             </CardTitle>
+            <CardDescription>
+              상위 5명은 화면을 나가도 순번이 유지돼요
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {status?.waiting.length ? (
+            {waiting.length ? (
               <div className="space-y-1.5">
-                {status.waiting.map((w) => (
+                {waiting.map((w) => (
                   <div
                     key={`${w.region}:${w.name}`}
-                    className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+                    className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
                   >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <Badge variant="secondary" className="shrink-0 tabular-nums">
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted text-[11px] font-semibold tabular-nums">
                         {w.position}
-                      </Badge>
+                      </span>
                       <span className="truncate">{w.name}</span>
                     </span>
-                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                      {w.lastSeenAgoSec}초 전
-                    </span>
+                    {w.detached ? (
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-[10px] text-muted-foreground"
+                      >
+                        화면 이탈 · 순번 유지
+                      </Badge>
+                    ) : (
+                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                        {w.lastSeenAgoSec}초 전
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                대기 중인 분석이 없어요
-              </p>
+              <EmptyState icon={Clock}>대기 중인 분석이 없어요</EmptyState>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <RefreshCw className="size-3" />
+      <p className="text-xs text-muted-foreground">
         실행 중·대기열은 서버 캐시 기준이며 5초 간격으로 갱신됩니다
       </p>
     </div>

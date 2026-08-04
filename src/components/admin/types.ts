@@ -11,6 +11,8 @@ export interface AdminStatus {
     region: string;
     name: string;
     lastSeenAgoSec: number;
+    /** 폴링이 끊겼지만 상위 순번이라 대기열에 유지 중 */
+    detached: boolean;
   }[];
   summoners: {
     region: string;

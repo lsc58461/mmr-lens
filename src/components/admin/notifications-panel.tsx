@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "./ui";
 
 export function NotificationsPanel() {
   const [channelId, setChannelId] = useState("");
@@ -49,27 +50,28 @@ export function NotificationsPanel() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-lg font-bold tracking-tight">디스코드 알림</h1>
-        <p className="text-xs text-muted-foreground">
-          인증된 소환사의 승급/강등·연승·시즌최고 시 Rift Lens 봇이 알림을 보내요
-        </p>
-      </div>
+      <PageHeader
+        title="디스코드 알림"
+        description="인증된 소환사의 승급/강등·연승·시즌최고 시 Rift Lens 봇이 알림을 보내요"
+        actions={
+          <span
+            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${
+              botReady
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            }`}
+          >
+            <span
+              className={`size-1.5 rounded-full ${botReady ? "bg-emerald-500" : "bg-amber-500"}`}
+            />
+            {botReady ? "봇 연결됨" : "봇 토큰 미설정"}
+          </span>
+        }
+      />
 
       <Card className="overflow-visible">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            알림 채널
-            {botReady ? (
-              <span className="text-xs font-normal text-emerald-500">
-                ● 봇 연결됨
-              </span>
-            ) : (
-              <span className="text-xs font-normal text-amber-500">
-                ● 봇 토큰 미설정
-              </span>
-            )}
-          </CardTitle>
+          <CardTitle className="text-base">알림 채널</CardTitle>
           <CardDescription>
             디스코드 개발자 모드를 켜고 채널 우클릭 → ID 복사로 얻을 수 있어요.
             봇이 해당 채널에 메시지를 보낼 권한이 있어야 합니다.

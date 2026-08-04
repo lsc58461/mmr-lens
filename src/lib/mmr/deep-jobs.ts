@@ -305,6 +305,62 @@ export async function ensureQueuedAndSchedule(
   return { selfStarted: head.key === selfKey, ahead: index };
 }
 
+export interface QueuedJob {
+  position: number;
+  region: string;
+  name: string;
+  lastSeenAgoSec: number;
+  /** 폴링 생존신호가 끊겼지만 상위 순번이라 유지 중 (브라우저를 닫고 떠난 경우) */
+  detached: boolean;
+}
+
+/**
+ * 현재 대기열 — 스케줄러가 보는 것과 동일한 보존 규칙(getQueue)을 그대로 쓴다.
+ * 어드민 표시용이지만 규칙을 따로 구현하면 실제 대기열과 어긋나므로 여기서 제공한다.
+ */
+export async function listQueue(): Promise<QueuedJob[]> {
+  const now = Date.now();
+  const queue = await getQueue();
+  return queue.flatMap((e, i) => {
+    const p = parseJobKey(e.key);
+    if (!p) return [];
+    return [
+      {
+        position: i + 1,
+        region: p.platform,
+        name: `${p.gameName}#${p.tagLine}`,
+        lastSeenAgoSec: Math.round((now - e.at) / 1000),
+        detached: now - e.at >= QUEUE_ENTRY_TTL_MS,
+      },
+    ];
+  });
+}
+
+export interface RunnerStatus {
+  region: string;
+  name: string;
+  progress: number;
+  state: string;
+  updatedAgoSec: number;
+}
+
+/** 지금 러너 락을 쥐고 돌아가는 정밀 분석 (죽은 잡은 제외) */
+export async function getRunnerStatus(): Promise<RunnerStatus | null> {
+  const holder = await cache.get<RunnerLock>(RUNNER_LOCK_KEY);
+  const now = Date.now();
+  if (!holder || holder.at === 0 || now - holder.at >= JOB_STALE_MS) return null;
+  const parsed = parseJobKey(holder.key);
+  const job = await cache.get<DeepJob>(holder.key);
+  if (!parsed || !job) return null;
+  return {
+    region: parsed.platform,
+    name: `${parsed.gameName}#${parsed.tagLine}`,
+    progress: job.progress,
+    state: job.state,
+    updatedAgoSec: Math.round((now - job.updatedAt) / 1000),
+  };
+}
+
 async function releaseDeepRunner(key: string): Promise<void> {
   const holder = await cache.get<RunnerLock>(RUNNER_LOCK_KEY);
   if (holder?.key === key) {

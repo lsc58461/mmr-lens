@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BadgeCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState, PageHeader, StatTile } from "./ui";
 
 interface Verified {
   platform: string;
@@ -30,11 +32,19 @@ export function VerifiedPanel() {
   }
 
   useEffect(() => {
+    let cancelled = false;
     fetch("/api/admin/verified")
       .then((r) => (r.ok ? r.json() : { items: [] }))
-      .then((d: { items?: Verified[] }) => setItems(d.items ?? []))
+      .then((d: { items?: Verified[] }) => {
+        if (!cancelled) setItems(d.items ?? []);
+      })
       .catch(() => {})
-      .finally(() => setLoaded(true));
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function toggle(v: Verified) {
@@ -58,30 +68,51 @@ export function VerifiedPanel() {
   }
 
   const activeCount = items.filter((v) => v.active).length;
+  const linked = items.filter((v) => v.discord_username).length;
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-lg font-bold tracking-tight">
-          인증된 소환사 ({activeCount})
-        </h1>
-        <p className="text-xs text-muted-foreground">
-          디스코드 멤버 인증을 마친 계정 — 승급/강등·연승·시즌최고 알림 대상
-        </p>
+      <PageHeader
+        title="인증된 소환사"
+        description="디스코드 멤버 인증을 마친 계정 — 승급/강등·연승·시즌최고 알림 대상"
+      />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <StatTile
+          icon={BadgeCheck}
+          label="알림 대상"
+          value={activeCount}
+          sub="활성 인증"
+          tone={activeCount ? "emerald" : "muted"}
+        />
+        <StatTile icon={BadgeCheck} label="전체 인증" value={items.length} />
+        <StatTile
+          icon={BadgeCheck}
+          label="디코 연동"
+          value={linked}
+          sub="알림에서 멘션됨"
+        />
       </div>
 
-      <Card>
-        <CardContent>
+      <Card className="py-0">
+        <CardContent className="px-0">
           <div className="divide-y divide-border/60">
             {items.map((v) => (
               <div
                 key={`${v.platform}:${v.game_name}#${v.tag_line}`}
-                className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm"
+                className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm transition-colors hover:bg-muted/40"
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <span
+                    className={`size-1.5 shrink-0 rounded-full ${
+                      v.active ? "bg-emerald-500" : "bg-muted-foreground/40"
+                    }`}
+                  />
+                  <span
                     className={
-                      v.active ? "truncate" : "truncate text-muted-foreground line-through"
+                      v.active
+                        ? "truncate font-medium"
+                        : "truncate text-muted-foreground line-through"
                     }
                   >
                     {v.game_name}#{v.tag_line}
@@ -98,9 +129,9 @@ export function VerifiedPanel() {
               </div>
             ))}
             {items.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">
+              <EmptyState icon={BadgeCheck}>
                 {loaded ? "아직 인증한 소환사가 없어요" : "불러오는 중…"}
-              </p>
+              </EmptyState>
             )}
           </div>
         </CardContent>

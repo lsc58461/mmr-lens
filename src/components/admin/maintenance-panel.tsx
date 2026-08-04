@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "./ui";
 
 interface Maintenance {
   active: boolean;
@@ -77,30 +78,46 @@ export function MaintenancePanel() {
   }
 
   const state = !mnt?.on
-    ? { label: "꺼짐", cls: "bg-muted text-muted-foreground" }
+    ? {
+        label: "꺼짐",
+        note: "방문자에게 사이트가 정상 노출돼요",
+        dot: "bg-muted-foreground/50",
+        cls: "border-border bg-muted/40 text-muted-foreground",
+      }
     : mnt.active
-      ? { label: "점검 중", cls: "bg-destructive text-white" }
-      : { label: "예약됨", cls: "bg-chart-2 text-white" };
+      ? {
+          label: "점검 중",
+          note: "모든 페이지가 점검 안내로 대체되고 있어요",
+          dot: "bg-destructive",
+          cls: "border-destructive/30 bg-destructive/10 text-destructive",
+        }
+      : {
+          label: "예약됨",
+          note: "시작 시각이 되면 자동으로 활성화돼요",
+          dot: "bg-amber-500",
+          cls: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+        };
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-lg font-bold tracking-tight">점검 모드</h1>
-        <p className="text-xs text-muted-foreground">
-          어드민·API는 점검 중에도 접속 가능해요
-        </p>
+      <PageHeader
+        title="점검 모드"
+        description="어드민·API는 점검 중에도 접속 가능해요"
+      />
+
+      <div
+        className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 ${state.cls}`}
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          <span className={`size-2 rounded-full ${state.dot}`} />
+          {state.label}
+        </span>
+        <span className="text-xs opacity-80">{state.note}</span>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            설정
-            <span
-              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${state.cls}`}
-            >
-              {state.label}
-            </span>
-          </CardTitle>
+          <CardTitle className="text-base">설정</CardTitle>
           <CardDescription>
             사유·기간을 설정하고 켜면 방문자에게 점검 페이지가 표시돼요. 종료
             시각이 지나면 자동으로 해제됩니다.

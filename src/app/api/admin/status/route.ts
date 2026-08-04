@@ -1,17 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_COOKIE, isValidAdminSession } from "@/lib/admin";
-import { cache } from "@/lib/cache";
+import { getRunnerStatus, listQueue } from "@/lib/mmr/deep-jobs";
 import { ALGO_VERSION } from "@/lib/mmr/estimate";
 import { getRecentSearches } from "@/lib/recent";
 import { listAnalysesMeta } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
-
-// 잡 키 "deepjob:kr:이름#태그" → { region, name }
-function parseJobKey(key: string): { region: string; name: string } {
-  const parts = key.split(":");
-  return { region: parts[1] ?? "?", name: parts.slice(2).join(":") };
-}
 
 export async function GET(req: NextRequest) {
   if (!(await isValidAdminSession(req.cookies.get(ADMIN_COOKIE)?.value))) {
@@ -19,42 +13,13 @@ export async function GET(req: NextRequest) {
   }
 
   const now = Date.now();
-  const [lock, queue, recent] = await Promise.all([
-    cache.get<{ key: string; at: number }>("deep-runner-lock"),
-    cache.get<{ key: string; at: number }[]>("deep-queue:list"),
+  // 실행 중·대기열은 deep-jobs가 제공한다 — 어드민이 규칙을 따로 구현하면
+  // 실제 스케줄러가 보는 대기열과 어긋난다(하트비트 끊긴 상위 순번이 숨는 문제)
+  const [running, waiting, recent] = await Promise.all([
+    getRunnerStatus(),
+    listQueue(),
     getRecentSearches(),
   ]);
-
-  let running: {
-    region: string;
-    name: string;
-    progress: number;
-    state: string;
-    updatedAgoSec: number;
-  } | null = null;
-  if (lock && now - lock.at < 5 * 60_000) {
-    const job = await cache.get<{
-      state: string;
-      progress: number;
-      updatedAt: number;
-    }>(lock.key);
-    if (job) {
-      running = {
-        ...parseJobKey(lock.key),
-        progress: job.progress,
-        state: job.state,
-        updatedAgoSec: Math.round((now - job.updatedAt) / 1000),
-      };
-    }
-  }
-
-  const waiting = (queue ?? [])
-    .filter((e) => now - e.at < 60_000)
-    .map((e, i) => ({
-      position: i + 1,
-      ...parseJobKey(e.key),
-      lastSeenAgoSec: Math.round((now - e.at) / 1000),
-    }));
 
   // 기록된 소환사 전체(최근 검색 기준) + 분석 보유·스테일 상태.
   // 스테일 판정은 저장 데이터 간 비교(정밀 vs 빠른의 매치 기준, 알고리즘 버전)로,

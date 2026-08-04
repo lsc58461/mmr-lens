@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { Copy, Loader2, Plus, Shuffle, Swords, Users, X } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyHint } from "@/components/page-kit";
 import { SummonerAutocomplete } from "@/components/summoner-autocomplete";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -128,26 +128,40 @@ export function TeamClient() {
       .catch(() => toast.error("복사에 실패했어요"));
   }
 
-  const teamCard = (title: string, idx: number[], color: string) => {
+  const teamCard = (title: string, idx: number[], tone: "blue" | "red") => {
     const sum = idx.reduce((s, i) => s + valid[i].points, 0);
+    const avg = idx.length ? Math.round(sum / idx.length) : 0;
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base">
-            <span style={{ color }}>{title}</span>
-            <span className="text-sm font-normal text-muted-foreground tabular-nums">
-              합계 {sum.toLocaleString()}pt
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1.5">
+      <div className="overflow-hidden rounded-xl border bg-card">
+        <div
+          className={`flex items-baseline justify-between px-4 py-2.5 ${
+            tone === "blue"
+              ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              : "bg-red-500/10 text-red-600 dark:text-red-400"
+          }`}
+        >
+          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-xs tabular-nums opacity-80">
+            평균 {avg.toLocaleString()}pt
+          </span>
+        </div>
+        <div className="divide-y divide-border/60">
           {idx.map((i) => (
             <div
               key={valid[i].name}
-              className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm"
+              className="flex items-center justify-between gap-2 px-4 py-2.5 text-sm"
             >
-              <span className="min-w-0 truncate font-medium">
-                {valid[i].name}
+              <span className="flex min-w-0 items-center gap-2">
+                <span
+                  className="size-1.5 shrink-0 rounded-full"
+                  style={{ background: TIER_COLORS[valid[i].tier] }}
+                />
+                <span className="truncate font-medium">{valid[i].name}</span>
+                {valid[i].source !== "analysis" && (
+                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                    {SOURCE_LABELS[valid[i].source]}
+                  </span>
+                )}
               </span>
               <span
                 className="shrink-0 text-xs"
@@ -157,8 +171,11 @@ export function TeamClient() {
               </span>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+        <div className="border-t px-4 py-2 text-right text-xs text-muted-foreground tabular-nums">
+          합계 {sum.toLocaleString()}pt
+        </div>
+      </div>
     );
   };
 
@@ -238,18 +255,45 @@ export function TeamClient() {
         </Card>
       )}
 
+      {!current && !loading && (
+        <EmptyHint icon={Swords} title="참가자를 입력하면 팀이 여기에 나와요">
+          짝수 인원(2·4·6·8·10명)으로 입력하고 팀 나누기를 누르면, 전력차가 가장
+          작은 조합부터 순서대로 보여드려요.
+        </EmptyHint>
+      )}
+
       {current && valid.length >= 2 && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Badge variant="secondary" className="tabular-nums">
-              전력차 {current.diff.toLocaleString()}pt · 조합{" "}
-              {(comboIndex % combos.length) + 1}/{combos.length}
-            </Badge>
-            <div className="flex gap-2">
+          {/* 전력 밸런스 — 두 팀 합계의 비율을 그대로 폭으로 */}
+          <div className="rounded-xl border bg-card p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="text-sm font-semibold">
+                전력차{" "}
+                <span className="tabular-nums">
+                  {current.diff.toLocaleString()}pt
+                </span>
+              </span>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                조합 {(comboIndex % combos.length) + 1} / {combos.length}
+              </span>
+            </div>
+            {(() => {
+              const sumA = current.a.reduce((s, i) => s + valid[i].points, 0);
+              const sumB = current.b.reduce((s, i) => s + valid[i].points, 0);
+              const pct = sumA + sumB > 0 ? (sumA / (sumA + sumB)) * 100 : 50;
+              return (
+                <div className="mt-2.5 flex h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="bg-blue-500" style={{ width: `${pct}%` }} />
+                  <div className="flex-1 bg-red-500" />
+                </div>
+              );
+            })()}
+            <div className="mt-3 flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setComboIndex((i) => i + 1)}
+                disabled={combos.length <= 1}
                 className="gap-1.5"
               >
                 <Shuffle className="size-3.5" />
@@ -266,15 +310,15 @@ export function TeamClient() {
               </Button>
             </div>
           </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
-            {teamCard("블루팀", current.a, "#3b82f6")}
-            {teamCard("레드팀", current.b, "#ef4444")}
+            {teamCard("블루팀", current.a, "blue")}
+            {teamCard("레드팀", current.b, "red")}
           </div>
+
           <p className="text-xs text-muted-foreground">
-            * 점수 출처:{" "}
-            {valid
-              .map((p) => `${p.name.split("#")[0]}(${SOURCE_LABELS[p.source]})`)
-              .join(" · ")}
+            표시 없는 참가자는 저장된 매칭 실력대 기준이고, &quot;현재 랭크&quot;
+            ·&quot;기본값&quot;은 분석 기록이 없어 대체한 점수예요.
           </p>
         </>
       )}

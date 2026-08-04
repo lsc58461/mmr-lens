@@ -1,4 +1,5 @@
 import { Swords } from "lucide-react";
+import { PageHeader } from "@/components/page-kit";
 import { TeamClient } from "./team-client";
 
 export const metadata = {
@@ -9,20 +10,12 @@ export const metadata = {
 
 export default function TeamPage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-          <Swords className="size-4.5" />
-        </span>
-        <div>
-          <h1 className="text-lg font-bold tracking-tight sm:text-xl">
-            내전 팀 밸런서
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            매칭 실력대 기준으로 가장 공평한 팀을 짜드려요
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        icon={Swords}
+        title="내전 팀 밸런서"
+        description="매칭 실력대 기준으로 가장 공평한 팀을 짜드려요"
+      />
       <TeamClient />
     </div>
   );

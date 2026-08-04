@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { BadgeCheck } from "lucide-react";
+import { PageHeader } from "@/components/page-kit";
 import {
   DISCORD_SESSION_COOKIE,
   getDiscordSession,
@@ -28,20 +29,12 @@ export default async function VerifyPage({
   ).catch(() => null);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-          <BadgeCheck className="size-4.5" />
-        </span>
-        <div>
-          <h1 className="text-lg font-bold tracking-tight sm:text-xl">
-            소환사 인증
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            서버 멤버 인증 후 계정을 연결하면 디스코드 승급/강등 알림을 받아요
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-3xl space-y-6">
+      <PageHeader
+        icon={BadgeCheck}
+        title="소환사 인증"
+        description="서버 멤버 인증 후 계정을 연결하면 디스코드 승급/강등 알림을 받아요"
+      />
       <VerifyClient
         discordEnabled={isDiscordConfigured()}
         discordUser={discordUser?.username ?? null}

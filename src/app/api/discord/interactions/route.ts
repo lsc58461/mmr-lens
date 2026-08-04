@@ -1,7 +1,6 @@
 import { createPublicKey, verify as cryptoVerify } from "crypto";
 import { NextResponse, after, type NextRequest } from "next/server";
 import { getStoredResult, runQuickAnalysis } from "@/lib/mmr/deep-jobs";
-import { pointsToRank } from "@/lib/mmr/rank";
 import { bestPartition, resolvePlayers } from "@/lib/mmr/team";
 import { getRecentSearches } from "@/lib/recent";
 import { getAccountByRiotId } from "@/lib/riot/client";

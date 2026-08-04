@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Heart, Loader2, Search, Swords } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyHint, Stat } from "@/components/page-kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,12 +38,30 @@ function timeAgo(ts: number): string {
   return `${Math.floor(days / 30)}개월 전`;
 }
 
-function verdictText(games: number, wins: number): string {
+function verdict(games: number, wins: number): {
+  text: string;
+  cls: string;
+} {
   const rate = (wins / games) * 100;
-  if (rate >= 60) return "환상의 듀오예요! 같이 하면 이깁니다 💙";
-  if (rate >= 50) return "안정적인 조합이에요 — 같이 해도 좋아요";
-  if (rate >= 40) return "미묘한 궁합… 컨디션 좋은 날만 같이 하세요";
-  return "이 조합은 위험해요. 각자 솔로큐가 나을지도…";
+  if (rate >= 60)
+    return {
+      text: "환상의 듀오예요! 같이 하면 이깁니다 💙",
+      cls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    };
+  if (rate >= 50)
+    return {
+      text: "안정적인 조합이에요 — 같이 해도 좋아요",
+      cls: "border-primary/30 bg-primary/10 text-primary",
+    };
+  if (rate >= 40)
+    return {
+      text: "미묘한 궁합… 컨디션 좋은 날만 같이 하세요",
+      cls: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    };
+  return {
+    text: "이 조합은 위험해요. 각자 솔로큐가 나을지도…",
+    cls: "border-destructive/30 bg-destructive/10 text-destructive",
+  };
 }
 
 export function DuoClient() {
@@ -110,58 +129,86 @@ export function DuoClient() {
         </CardContent>
       </Card>
 
+      {!result && !loading && (
+        <EmptyHint icon={Heart} title="두 소환사를 입력하면 궁합이 나와요">
+          최근 100경기 안에서 함께 잡힌 판을 찾아 같은 팀 승률과 맞대결 전적을
+          계산합니다.
+        </EmptyHint>
+      )}
+
       {result && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border bg-card p-4">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Heart className="size-3.5 text-primary" />
-                함께 플레이
-              </div>
-              <div className="mt-1.5 text-xl font-bold tabular-nums">
-                {t?.games ?? 0}판
-                {t && t.games > 0 && (
-                  <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-                    {t.wins}승 {t.games - t.wins}패
-                  </span>
-                )}
-              </div>
+          {/* 두 사람 — 이름과 함께 승률을 한 줄로 */}
+          <div className="rounded-xl border bg-card p-5">
+            <div className="flex items-center justify-center gap-3 text-sm font-semibold sm:text-base">
+              <span className="min-w-0 flex-1 truncate text-right">
+                {result.a.name.split("#")[0]}
+              </span>
+              <Heart className="size-4 shrink-0 text-primary" />
+              <span className="min-w-0 flex-1 truncate">
+                {result.b.name.split("#")[0]}
+              </span>
             </div>
-            <div className="rounded-xl border bg-card p-4">
-              <div className="text-xs text-muted-foreground">함께 승률</div>
-              <div
-                className={`mt-1.5 text-xl font-bold tabular-nums ${
-                  winrate === null
-                    ? ""
-                    : winrate >= 50
-                      ? "text-emerald-500"
-                      : "text-red-500"
-                }`}
-              >
-                {winrate !== null ? `${winrate}%` : "—"}
-              </div>
-            </div>
-            <div className="col-span-2 rounded-xl border bg-card p-4 sm:col-span-1">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Swords className="size-3.5 text-chart-2" />
-                맞대결
-              </div>
-              <div className="mt-1.5 text-xl font-bold tabular-nums">
-                {result.versus.games}판
-                {result.versus.games > 0 && (
-                  <span className="ml-1.5 text-sm font-normal text-muted-foreground">
-                    {result.a.name.split("#")[0]} {result.versus.aWins}승
-                  </span>
-                )}
-              </div>
-            </div>
+            {winrate !== null && t ? (
+              <>
+                <div className="mt-4 text-center">
+                  <div
+                    className={`text-4xl font-bold tabular-nums ${
+                      winrate >= 50 ? "text-emerald-500" : "text-red-500"
+                    }`}
+                  >
+                    {winrate}%
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    함께 {t.games}판 · {t.wins}승 {t.games - t.wins}패
+                  </div>
+                </div>
+                <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="bg-emerald-500"
+                    style={{ width: `${winrate}%` }}
+                  />
+                  <div className="flex-1 bg-red-500/70" />
+                </div>
+              </>
+            ) : (
+              <p className="mt-3 text-center text-sm text-muted-foreground">
+                최근 100경기 안에서 같은 팀으로 만난 기록이 없어요
+              </p>
+            )}
           </div>
 
           {t && t.games > 0 && (
-            <div className="rounded-xl border bg-primary/5 px-4 py-3 text-sm font-medium">
-              {verdictText(t.games, t.wins)}
+            <div
+              className={`rounded-xl border px-4 py-3 text-center text-sm font-medium ${verdict(t.games, t.wins).cls}`}
+            >
+              {verdict(t.games, t.wins).text}
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Stat
+              icon={Heart}
+              label="함께 플레이"
+              value={`${t?.games ?? 0}판`}
+              sub={t && t.games > 0 ? `${t.wins}승 ${t.games - t.wins}패` : undefined}
+            />
+            <Stat
+              icon={Swords}
+              label="맞대결"
+              value={`${result.versus.games}판`}
+              sub={
+                result.versus.games > 0
+                  ? `${result.a.name.split("#")[0]} ${result.versus.aWins}승`
+                  : undefined
+              }
+            />
+            <Stat
+              label="교집합 경기"
+              value={`${result.totalCommon}건`}
+              sub="최근 100경기 기준"
+            />
+          </div>
 
           {result.games.length > 0 && (
             <Card>

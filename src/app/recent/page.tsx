@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ChevronRight, History } from "lucide-react";
+import { ArrowRight, ChevronRight, History } from "lucide-react";
+import { PageHeader } from "@/components/page-kit";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getRecentSearches } from "@/lib/recent";
@@ -28,17 +29,11 @@ export default async function RecentPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2.5">
-        <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-          <History className="size-4.5" />
-        </span>
-        <div>
-          <h1 className="text-lg font-bold tracking-tight sm:text-xl">최근 검색</h1>
-          <p className="text-sm text-muted-foreground">
-            최근 조회된 소환사 {entries.length}명
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={History}
+        title="최근 검색"
+        description={`최근 조회된 소환사 ${entries.length}명`}
+      />
 
       {entries.length === 0 ? (
         <Card>
@@ -71,10 +66,9 @@ export default async function RecentPage() {
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-5 text-left text-xs sm:text-right sm:text-sm">
-                <div>
-                  <div className="text-[10px] text-muted-foreground">티어</div>
-                  <div
+              <div className="flex shrink-0 items-center gap-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <span
                     className="font-medium"
                     style={
                       e.currentTier
@@ -83,14 +77,10 @@ export default async function RecentPage() {
                     }
                   >
                     {e.currentLabel ?? "언랭크"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-muted-foreground">
-                    매칭 실력대
-                  </div>
-                  <div
-                    className="font-medium"
+                  </span>
+                  <ArrowRight className="size-3.5 shrink-0 text-muted-foreground/60" />
+                  <span
+                    className="font-semibold"
                     style={
                       e.estimatedTier
                         ? { color: TIER_COLORS[e.estimatedTier] }
@@ -98,14 +88,14 @@ export default async function RecentPage() {
                     }
                   >
                     {e.estimatedLabel ?? "표본 부족"}
-                    {e.estimatedPoints !== null && (
-                      <span className="ml-1 text-xs font-normal text-muted-foreground tabular-nums">
-                        {Math.round(e.estimatedPoints).toLocaleString()}pt
-                      </span>
-                    )}
-                  </div>
+                  </span>
+                  {e.estimatedPoints !== null && (
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {Math.round(e.estimatedPoints).toLocaleString()}pt
+                    </span>
+                  )}
                 </div>
-                <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:ml-0" />
+                <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 sm:ml-0" />
               </div>
             </Link>
           ))}

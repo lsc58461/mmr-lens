@@ -21,6 +21,32 @@ const CHANGELOG: {
 }[] = [
   {
     date: "2026-08-05",
+    title: "분석 속도와 화면 정리",
+    items: [
+      {
+        tag: "개선",
+        text: "정밀 분석이 더 빨라졌어요 — 표본 구성을 조정하고 참가자 랭크 재사용 기간을 늘렸습니다",
+      },
+      {
+        tag: "개선",
+        text: "실력대 추이 그래프 — 승/패를 점 채움으로 구분하고, 매칭 실력대 선에도 점과 범례를 추가했어요",
+      },
+      {
+        tag: "개선",
+        text: "소환사 페이지 — 최근 전적과 분석에 사용된 경기를 탭으로 묶어 스크롤을 줄였어요",
+      },
+      {
+        tag: "개선",
+        text: "내전 밸런서·듀오 궁합·시즌 결산·인증 페이지 디자인 정리 (팀 전력차 막대, 듀오 승률 게이지, 챔피언 막대 등)",
+      },
+      {
+        tag: "수정",
+        text: "그래프 세로축에서 마스터 이상 티어 표기가 줄바꿈되던 문제",
+      },
+    ],
+  },
+  {
+    date: "2026-08-05",
     title: "닉네임 재사용 대응",
     items: [
       {
@@ -203,7 +229,8 @@ export default function UpdatesPage() {
 
       <div className="relative space-y-8 border-l pl-6">
         {CHANGELOG.map((entry) => (
-          <section key={entry.date} className="relative">
+          // 같은 날짜에 항목이 둘 이상일 수 있어 날짜만으로는 키가 겹친다
+          <section key={`${entry.date}-${entry.title}`} className="relative">
             <span className="absolute left-[-1.85rem] top-1.5 size-2.5 rounded-full bg-primary ring-4 ring-background" />
             <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h2 className="font-semibold">{entry.title}</h2>

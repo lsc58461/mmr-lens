@@ -34,8 +34,12 @@ export interface AnalysisDepth {
 
 // 빠른 추정: 개발 키(2분당 100회)로도 수 초 안에 끝나는 표본
 export const QUICK_DEPTH: AnalysisDepth = { matches: 8, samplesPerTeam: 3 };
-// 정밀 분석: 20경기 × 본인 제외 전원(내 팀 4 + 상대 팀 5)
-export const DEEP_DEPTH: AnalysisDepth = { matches: 20, samplesPerTeam: 5 };
+// 정밀 분석: 20경기 × 팀당 3명(매치당 6명).
+// 전원(5 = 내 팀 4 + 상대 5 = 9명) 조회에서 줄인 값 — 참가자 랭크 조회가
+// 정밀 분석 API 콜의 90%를 차지해 대기 시간을 지배했다. 매치당 6명이면
+// trimmedMean의 절사 조건(5명 이상)도 유지되고, 로비 평균의 표본오차 증가는
+// 매치 20건의 평균으로 상쇄된다. 경기 수는 추이 그래프에 그대로 쓰이므로 유지.
+export const DEEP_DEPTH: AnalysisDepth = { matches: 20, samplesPerTeam: 3 };
 
 /** 리메이크 제외분을 감안해 여유 있게 조회할 매치 ID 수 */
 export function fetchCountFor(depth: AnalysisDepth): number {

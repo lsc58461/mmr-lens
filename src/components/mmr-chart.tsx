@@ -35,10 +35,11 @@ const chartConfig = {
 // 쓰면 값이 비어 스와치가 통째로 안 보인다.
 const LOBBY_COLOR = "var(--chart-1)";
 const EST_COLOR = "var(--chart-2)";
-// 패배 점 색. --destructive는 다크모드에서 hue 22로, 매칭 실력대 선(--chart-2,
-// hue 58)과 작은 점 크기에서 거의 구분되지 않아 "주황 점이 파란 선에 찍혀 있다"로
-// 읽혔다. 확실히 붉은 고정색을 써서 계열을 분리한다.
-const LOSS_COLOR = "oklch(0.62 0.23 15)";
+
+// 점 색은 계열 색 하나로 고정한다.
+// 예전엔 로비 점의 색으로 승패를 표현했는데, 패배 점(붉은 계열)이 매칭 실력대
+// 선(주황)과 섞여 "파란 선에 주황 점이 찍혀 있다"로 읽혔다. 점 색에 계열과 승패
+// 두 가지 의미를 겹쳐 실은 게 원인이라, 승패는 채움/비움으로 분리한다.
 
 export function MmrChart({
   data,
@@ -77,13 +78,25 @@ export function MmrChart({
           </linearGradient>
         </defs>
         <CartesianGrid vertical={false} strokeDasharray="3 3" />
-        <XAxis dataKey="game" tickLine={false} axisLine={false} fontSize={11} />
+        <XAxis
+          dataKey="game"
+          tickLine={false}
+          axisLine={false}
+          fontSize={11}
+          // 20경기까지 늘어나면 라벨이 서로 겹친다 — 양 끝은 유지하고 사이는 솎아낸다
+          interval="preserveStartEnd"
+          minTickGap={28}
+        />
         <YAxis
           domain={[Math.floor(min - pad), Math.ceil(max + pad)]}
+          // 마스터 이상은 라벨이 "마스터 65LP"(구분자 없음)라 split만으로는
+          // LP가 남아 축에서 줄바꿈된다 — 뒤의 LP 표기를 함께 떼어낸다
           tickFormatter={(v: number) =>
             compact
               ? pointsToShortLabel(v)
-              : pointsToRank(v).label.split(" · ")[0]
+              : pointsToRank(v)
+                  .label.split(" · ")[0]
+                  .replace(/\s\d+LP$/, "")
           }
           tickLine={false}
           axisLine={false}
@@ -124,15 +137,16 @@ export function MmrChart({
           strokeWidth={2}
           fill="url(#fillLobby)"
           connectNulls
+          // 승 = 채운 점, 패 = 속 빈 점 (색은 계열 색으로 통일)
           dot={({ cx, cy, payload, index }) => (
             <circle
               key={index}
               cx={cx}
               cy={cy}
               r={4}
-              fill={payload.win ? LOBBY_COLOR : LOSS_COLOR}
-              stroke="var(--background)"
-              strokeWidth={1.5}
+              fill={payload.win ? LOBBY_COLOR : "var(--background)"}
+              stroke={payload.win ? "var(--background)" : LOBBY_COLOR}
+              strokeWidth={payload.win ? 1.5 : 2}
             />
           )}
         />
@@ -151,6 +165,9 @@ export function MmrChart({
             fill: EST_COLOR,
             stroke: "var(--background)",
             strokeWidth: 1.5,
+            // Line의 strokeDasharray가 점의 원 테두리까지 상속돼 테두리가
+            // 잘려 찌그러져 보인다 — 점에서는 실선으로 되돌린다
+            strokeDasharray: "0",
           }}
         />
       </ComposedChart>
@@ -189,15 +206,15 @@ export function MmrChart({
           <span className="text-muted-foreground/70">로비 점</span>
           <span className="flex items-center gap-1">
             <span
-              className="size-2 rounded-full"
+              className="size-2.5 rounded-full"
               style={{ background: LOBBY_COLOR }}
             />
             승
           </span>
           <span className="flex items-center gap-1">
             <span
-              className="size-2 rounded-full"
-              style={{ background: LOSS_COLOR }}
+              className="size-2.5 rounded-full border-2"
+              style={{ borderColor: LOBBY_COLOR }}
             />
             패
           </span>

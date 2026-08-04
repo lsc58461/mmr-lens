@@ -298,6 +298,37 @@ export async function recordNameChange(
     WHERE platform = ${platform}
       AND old_name_lower = ${newGameName.toLowerCase()}
       AND old_tag_lower = ${newTagLine.toLowerCase()}`;
+  // 옛 이름으로 남아 있던 분석·검색 기록 제거. migrateIdentity가 puuid 기준으로
+  // 지우지만 puuid 컬럼 도입 이전 행은 비어 있어서 이름 기준으로도 정리한다.
+  // (이 시점의 옛 이름은 주인이 없으므로 남의 기록을 지울 위험이 없다)
+  const oldName = oldGameName.toLowerCase();
+  const oldTag = oldTagLine.toLowerCase();
+  await sql`
+    DELETE FROM analyses
+    WHERE platform = ${platform}
+      AND game_name_lower = ${oldName} AND tag_line_lower = ${oldTag}`;
+  await sql`
+    DELETE FROM recent_searches
+    WHERE platform = ${platform}
+      AND game_name_lower = ${oldName} AND tag_line_lower = ${oldTag}`;
+}
+
+/**
+ * 해당 이름이 실제로 존재하는 계정으로 확인되면 닉변 매핑을 제거한다.
+ * 롤 닉네임은 재사용 가능해서, 남이 옛 이름을 가져간 경우 잘못된 리다이렉트를
+ * 계속 하게 되므로 검색 성공 시점에 매핑을 무효화한다.
+ */
+export async function clearRenameMapping(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<void> {
+  const sql = await getSql();
+  await sql`
+    DELETE FROM name_history
+    WHERE platform = ${platform}
+      AND old_name_lower = ${gameName.toLowerCase()}
+      AND old_tag_lower = ${tagLine.toLowerCase()}`;
 }
 
 /** 닉변 감지: puuid로 저장된 옛 닉네임 행들을 새 닉네임으로 이관 */

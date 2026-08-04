@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { findRenamedTo } from "@/lib/store";
+import { resolveRenameTarget } from "@/lib/rename";
 import { PLATFORM_LABELS, type PlatformRegion } from "@/lib/riot/types";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ renamed: null });
   }
   try {
-    const to = await findRenamedTo(
+    const to = await resolveRenameTarget(
       region as PlatformRegion,
       riotId.slice(0, hash),
       riotId.slice(hash + 1),

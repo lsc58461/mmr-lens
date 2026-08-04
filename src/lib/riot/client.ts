@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { currentPriority, riotLimiter } from "./limiter";
 import { cache, cached } from "@/lib/cache";
 import {
+  clearRenameMapping,
   findSummonerByName,
   findSummonerByPuuid,
   getMatchRow,
@@ -120,6 +121,12 @@ export async function getAccountByRiotId(
       account.gameName,
       account.tagLine,
     ).catch(() => {});
+  } else {
+    // 이 이름이 실존 계정으로 확인됨 — 남이 옛 이름을 가져간 경우를 대비해
+    // 이 이름을 old로 갖는 닉변 매핑을 무효화한다 (잘못된 리다이렉트 방지)
+    await clearRenameMapping(platform, account.gameName, account.tagLine).catch(
+      () => {},
+    );
   }
   // 닉변 승계 — 같은 puuid의 옛 닉네임 기록을 새 닉네임으로 정리
   await migrateIdentity(
@@ -129,6 +136,46 @@ export async function getAccountByRiotId(
     account.tagLine,
   ).catch(() => {});
   return account;
+}
+
+// 닉네임 점유 확인 캐시 — 리다이렉트 경로마다 API를 두드리지 않도록 6시간 보관
+const TAKEN_TTL_SEC = 6 * 60 * 60;
+
+/**
+ * 해당 Riot ID를 지금 쓰고 있는 계정이 있는지 확인한다 (summoners 캐시 우회 raw 조회).
+ * 롤 닉네임은 재사용 가능해서, 닉변 리다이렉트 전에 옛 이름이 비어 있는지 확인하는 용도.
+ * true=주인 있음 / false=비어 있음 / null=확인 실패(레이트리밋·장애 등)
+ */
+export async function isRiotIdTaken(
+  platform: PlatformRegion,
+  gameName: string,
+  tagLine: string,
+): Promise<boolean | null> {
+  const key = `taken:${keyFp()}:${platform}:${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
+  const hit = await cache.get<boolean>(key);
+  if (hit !== null) return hit;
+
+  const routing = PLATFORM_TO_ROUTING[platform];
+  let taken: boolean;
+  try {
+    const account = await riotFetch<RiotAccount>(
+      `https://${routing}.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+    );
+    taken = true;
+    // 실존 계정이니 이름 기록도 최신화해 둔다
+    await upsertSummonerNames(
+      keyFp(),
+      platform,
+      account.puuid,
+      account.gameName,
+      account.tagLine,
+    ).catch(() => {});
+  } catch (e) {
+    if (e instanceof RiotApiError && e.status === 404) taken = false;
+    else return null;
+  }
+  await cache.set(key, taken, TAKEN_TTL_SEC);
+  return taken;
 }
 
 /**

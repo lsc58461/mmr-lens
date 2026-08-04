@@ -50,6 +50,7 @@ import {
   type LpInsight,
 } from "@/lib/mmr/lp-insight";
 import { recordSearch } from "@/lib/recent";
+import { resolveRenameTarget } from "@/lib/rename";
 import {
   getAccountByPuuid,
   getAccountByRiotId,
@@ -234,8 +235,9 @@ export default async function SummonerPage({
 
   const platform = region as PlatformRegion;
 
-  // 닉변 이력이 있으면(저장된 분석이 남아 있어도) 새 이름으로 먼저 이동
-  const known = await findRenamedTo(platform, gameName, tagLine).catch(
+  // 닉변 이력이 있으면(저장된 분석이 남아 있어도) 새 이름으로 먼저 이동.
+  // 옛 이름을 남이 가져갔는지 확인 후에만 이동한다 (resolveRenameTarget)
+  const known = await resolveRenameTarget(platform, gameName, tagLine).catch(
     () => null,
   );
   if (known) {

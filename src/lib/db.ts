@@ -7,8 +7,17 @@ import type { Sql } from "postgres";
 const globalForDb = globalThis as unknown as { __mmrSql?: Promise<Sql> };
 
 async function initSchema(sql: Sql): Promise<void> {
-  // 콜드 스타트 비용을 줄이기 위해 전체 DDL을 단일 왕복으로 실행한다
+  // 콜드 스타트 비용을 줄이기 위해 전체 DDL을 단일 왕복으로 실행한다.
+  // 파라미터가 없으므로 simple 프로토콜 = 배치 전체가 하나의 암묵적 트랜잭션이고,
+  // 첫 줄의 advisory lock이 커밋까지 유지된다.
+  //
+  // 이 락이 필요한 이유: 빌드 시 프리렌더 워커 15개, 서버리스에선 콜드 스타트가
+  // 동시에 같은 DDL을 돌린다. CREATE/ALTER가 잡는 테이블 락이 세션마다 엇갈려
+  // 데드락이 났다(build 로그의 DeadLockReport). 직렬화하면 뒤 세션은 이미
+  // 반영된 멱등 DDL을 빠르게 통과한다.
   await sql.unsafe(`
+    SELECT pg_advisory_xact_lock(4919, 1);
+
     -- 범용 KV — 잡 상태·락·대기열·쿨다운·점검 플래그 등 휘발성 데이터 전용
     CREATE TABLE IF NOT EXISTS cache_entries (
       key text PRIMARY KEY,
